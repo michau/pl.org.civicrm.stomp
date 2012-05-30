@@ -1,0 +1,35 @@
+<?php
+
+/**
+ * Implementation of hook_init
+ */
+function _stomp_init() {
+  // Try to get the basic path via libraries API.
+  if (module_exists('libraries')) {
+    $path = libraries_get_path('stomp-php');
+
+    // TODO: use better initialisation
+    require_once $path . '/src/main/FuseSource/Stomp/ExceptionInterface.php';
+    require_once $path . '/src/main/FuseSource/Stomp/Exception/StompException.php';
+    require_once $path . '/src/main/FuseSource/Stomp/Stomp.php';
+    require_once $path . '/src/main/FuseSource/Stomp/Frame.php';
+    require_once $path . '/src/main/FuseSource/Stomp/Message.php';
+    require_once $path . '/src/main/FuseSource/Stomp/Message/Bytes.php';
+    require_once $path . '/src/main/FuseSource/Stomp/Message/Map.php';
+
+    $con = new FuseSource\Stomp\Stomp("tcp://localhost:61613");
+    $con->connect();
+
+  }
+}
+
+function civicrm_stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
+
+    if ( $objectName == 'Individual' && $op == 'edit' ) {
+        _stomp_init();
+        // TODO: impl
+    }
+    
+
+    return;
+}
