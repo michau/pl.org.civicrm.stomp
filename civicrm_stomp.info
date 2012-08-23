@@ -1,6 +1,0 @@
-name = STOMP protocol implementation for CiviCRM
-description = Integration of STOMP protocol for use with CiviCRM
-core = 7.x
-package = CiviCRM
-dependencies[] = civicrm
-dependencies[] = libraries
