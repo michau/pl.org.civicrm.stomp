@@ -1,20 +1,22 @@
 <?xml version="1.0"?>
 <extension key="pl.org.civicrm.stomp" type="module">
   <file>stomp</file>
-  <name>FIXME</name>
-  <description>FIXME</description>
-  <license>FIXME</license>
+  <name>STOMP protocol for CiviCRM</name>
+  <description>This extensions provides CiviCRM with ability to send STOMP 
+  messages with full information about the change every time a contact is saved.
+  </description>
+  <license>Academic Free License version 3.0</license>
   <maintainer>
-    <author>FIXME</author>
-    <email>FIXME@example.com</email>
+    <author>Caltha Sp.J.</author>
+    <email>michal@civicrm.org.pl</email>
   </maintainer>
   <releaseDate>2012-08-22</releaseDate>
-  <version>1.0</version>
+  <version>0.2</version>
   <develStage>alpha</develStage>
   <compatibility>
     <ver>4.2</ver>
   </compatibility>
-  <comments>This is a new, undeveloped module</comments>
+  <comments></comments>
   <civix>
     <namespace>CRM/Stomp</namespace>
   </civix>
