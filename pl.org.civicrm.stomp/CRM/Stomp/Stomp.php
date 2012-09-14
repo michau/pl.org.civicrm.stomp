@@ -49,8 +49,6 @@ class CRM_Stomp_StompHelper {
     /**
      * class constructor
      *
-     * @return CRM_Core_Smarty
-     * @access private
      */
     function __construct() {
         // FIXME: path solely for command line testing
@@ -64,6 +62,7 @@ class CRM_Stomp_StompHelper {
         require_once $path . 'Stomp/Message/Bytes.php';
         require_once $path . 'Stomp/Message/Map.php';
 
+        $this->log( "Initialising" );
         $this->_stomp = new Stomp($this->_stompServerURL);
         try {
             $this->_stomp->connect();
@@ -71,6 +70,14 @@ class CRM_Stomp_StompHelper {
             CRM_Core_Error::fatal('Problem with STOMP connection initialisation! Caught exception: ' . $e->getMessage() . "\n");
         }
     }
+
+     /**
+     * class destructor
+     *
+     */
+    function __destruct() {
+    }
+
 
     /**
      * Static instance provider.
@@ -84,13 +91,18 @@ class CRM_Stomp_StompHelper {
         return self::$_singleton;
     }
 
-    public function send( $map ) {
-        
-        $time_start = microtime();
-        
+    private function prepMessage( $msg ) {
         $header = array();
         $header['transformation'] = 'jms-map-json';
         $mapMessage = new Map($map, $header);
+        return $mapMessage;
+    }
+    
+    public function send( $map ) {
+        
+        $time_start = microtime();
+
+        $mapMessage = $this->prepMessage( $map );
         $this->_stomp->send("/queue/civicrm", $mapMessage );
         
         $time_end = microtime();
@@ -98,7 +110,7 @@ class CRM_Stomp_StompHelper {
         list($usec, $sec) = explode(" ", $d);
         $duration = ((float)$usec + (float)$sec);
         
-        _log( 'Sent message in ' . $duration . '! ', $op, $objectName, $objectId, $duration );
+        $this->log( 'Sent message in ' . $duration . '! ', $op, $objectName, $objectId, $duration );
         
     }
     

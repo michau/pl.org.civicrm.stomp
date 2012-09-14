@@ -4,6 +4,7 @@ require_once 'stomp.civix.php';
 use FuseSource\Stomp\Stomp;
 use FuseSource\Stomp\Message\Map;
 
+require_once 'CRM/Stomp/Stomp.php';
 
 /**
  * Implementation of hook_civicrm_config
@@ -79,7 +80,6 @@ function stomp_civicrm_managed(&$entities) {
  * the operation if it's not.
  */
 function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {
-        _stomp_initialise();
 }
 
 
@@ -91,74 +91,18 @@ function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {
  */
 function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
 
+    $stomp = CRM_Stomp_StompHelper::singleton(); 
+    
     switch( $objectName ) {
         case 'Individual':
             break;
         default:
-            _log('Nothing to do', $op, $objectName, $objectId);
+            $stomp->log('Nothing to do', $op, $objectName, $objectId);
     }
         
-    if ( $objectName == 'Individual' && $op == 'edit' ) {
-
-        _stomp_send( $objectRef );
-
+    if ( $objectName == 'Individual' && $op == 'edit' ) {           
+        $stomp->send( $map );
     }
     
-
     return;
 }
-
-function microtime_float()
-{
-    list($usec, $sec) = explode(" ", microtime());
-    return ((float)$usec + (float)$sec);
-}
-
-/**
- * 
- */
-function _stomp_send( $map ) {
-
-    require_once 'CRM/Stomp/Stomp.php';
-    $stomp = CRM_Stomp_StompHelper::singleton();
-
-    $header = array();
-    $header['transformation'] = 'jms-map-json';
-    $mapMessage = new Map($map, $header);
-    
-    $stomp->send( $mapMessage );
-}
-
-
-/**
- * 
- */
-function _stomp_initialise() {
-    $path = 'packages/stomp-php/FuseSource/';
-
-    require_once $path.'Stomp/ExceptionInterface.php';
-    require_once $path.'Stomp/Exception/StompException.php';
-    require_once $path.'Stomp/Stomp.php';
-    require_once $path.'Stomp/Frame.php';
-    require_once $path.'Stomp/Message.php';
-    require_once $path.'Stomp/Message/Bytes.php';
-    require_once $path.'Stomp/Message/Map.php';
-    
-}
-
-/**
- * 
- */
-function _log( $message = 'UNKNOWN', $op = 'UNKNOWN', $objectName = 'UNKNOWN', $objectId = 'UNKNOWN' ) {
-     // TODO: make it configurable
-     $file = '/tmp/stomp.log';
-     $text = strtr("@time - Performed \"@op\" on \"@name #@id\" with message: @msg\n", array(
-         '@op' => $op,
-         '@time' => date('Y-m-d H:i:s'),
-         '@id' => $objectId,
-         '@name' => $objectName,
-         '@msg' => $message
-     ));
-     file_put_contents($file, $text, FILE_APPEND);
-}
-
