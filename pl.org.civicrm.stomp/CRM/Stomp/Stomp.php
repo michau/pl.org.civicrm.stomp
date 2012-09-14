@@ -54,7 +54,8 @@ class CRM_Stomp_StompHelper {
      */
     function __construct() {
         // FIXME: path solely for command line testing
-        $path = '../../packages/stomp-php/FuseSource/';
+        //$path = '../../packages/stomp-php/FuseSource/';
+        $path = 'packages/stomp-php/FuseSource/';
         require_once $path . 'Stomp/ExceptionInterface.php';
         require_once $path . 'Stomp/Exception/StompException.php';
         require_once $path . 'Stomp/Stomp.php';
@@ -67,7 +68,7 @@ class CRM_Stomp_StompHelper {
         try {
             $this->_stomp->connect();
         } catch (StompException $e) {
-            CRM_Core_Error::fatal('Problem on STOMP connection initialisation! Caught exception: ' . $e->getMessage() . "\n");
+            CRM_Core_Error::fatal('Problem with STOMP connection initialisation! Caught exception: ' . $e->getMessage() . "\n");
         }
     }
 
@@ -83,11 +84,36 @@ class CRM_Stomp_StompHelper {
         return self::$_singleton;
     }
 
+    public function send( $map ) {
+        
+        $time_start = microtime();
+        
+        $header = array();
+        $header['transformation'] = 'jms-map-json';
+        $mapMessage = new Map($map, $header);
+        $this->_stomp->send("/queue/civicrm", $mapMessage );
+        
+        $time_end = microtime();
+        $d = $time_end - $time_start;
+        list($usec, $sec) = explode(" ", $d);
+        $duration = ((float)$usec + (float)$sec);
+        
+        _log( 'Sent message in ' . $duration . '! ', $op, $objectName, $objectId, $duration );
+        
+    }
+    
+   
+    function microtime_float()
+    {
+        list($usec, $sec) = explode(" ", microtime());
+        return ((float)$usec + (float)$sec);
+    }
+    
     /**
      * Text file logging
      *
      */
-    public function log($message = 'UNKNOWN', $op = 'UNKNOWN', $objectName = 'UNKNOWN', $objectId = 'UNKNOWN') {
+    public function log($message = 'UNKNOWN', $op = 'UNKNOWN', $objectName = 'UNKNOWN', $objectId = 'UNKNOWN', $duration = 'UNKNOWN') {
         $text = strtr("@time - Performed \"@op\" on \"@name #@id\" with message: @msg\n", array(
             '@op' => $op,
             '@time' => date('Y-m-d H:i:s'),
@@ -95,6 +121,11 @@ class CRM_Stomp_StompHelper {
             '@name' => $objectName,
             '@msg' => $message
                 ));
+                
+        if( $duration !== 'UNKNOWN' ) {
+            $text = $text . " " . "(Duration: " . $duration . " )";
+        }
+
         file_put_contents($this->_logPath, $text, FILE_APPEND);
     }
 
@@ -102,9 +133,12 @@ class CRM_Stomp_StompHelper {
 
 // FIXME: Command line testing stuff - convenient for now
 
-require_once '/home/michau/Sandboxes/civicrm.drupal7/civicrm.config.php';
-$config = CRM_Core_Config::singleton();
+//require_once '/home/michau/Sandboxes/civicrm.drupal7/civicrm.config.php';
+//$config = CRM_Core_Config::singleton();
 
-$stomp = CRM_Stomp_StompHelper::singleton();
-var_dump($stomp);
+//$testmsg = array( 'blah' => 'hello' );
+
+//$stomp = CRM_Stomp_StompHelper::singleton();
+//$stomp->send( $testmsg );
+//var_dump($stomp);
 ?>

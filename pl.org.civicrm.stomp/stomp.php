@@ -99,13 +99,19 @@ function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
     }
         
     if ( $objectName == 'Individual' && $op == 'edit' ) {
-        // we'll send edit event here
+
         _stomp_send( $objectRef );
-        _log( 'Sent message! ', $op, $objectName, $objectId );
+
     }
     
 
     return;
+}
+
+function microtime_float()
+{
+    list($usec, $sec) = explode(" ", microtime());
+    return ((float)$usec + (float)$sec);
 }
 
 /**
@@ -113,13 +119,14 @@ function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
  */
 function _stomp_send( $map ) {
 
-    $con = new Stomp("tcp://localhost:61613");
-    $con->connect();
-    $body = $map;
+    require_once 'CRM/Stomp/Stomp.php';
+    $stomp = CRM_Stomp_StompHelper::singleton();
+
     $header = array();
     $header['transformation'] = 'jms-map-json';
-    $mapMessage = new Map($body, $header);
-    $con->send("/queue/civicrm", $mapMessage );
+    $mapMessage = new Map($map, $header);
+    
+    $stomp->send( $mapMessage );
 }
 
 
@@ -136,8 +143,6 @@ function _stomp_initialise() {
     require_once $path.'Stomp/Message.php';
     require_once $path.'Stomp/Message/Bytes.php';
     require_once $path.'Stomp/Message/Map.php';
-
-
     
 }
 
