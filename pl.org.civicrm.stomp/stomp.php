@@ -1,6 +1,8 @@
 <?php
 
 require_once 'stomp.civix.php';
+require_once 'CRM/Stomp/Stomp.php';
+require_once 'CRM/Core/Config.php';
 use FuseSource\Stomp\Stomp;
 use FuseSource\Stomp\Message\Map;
 
@@ -11,6 +13,8 @@ require_once 'CRM/Stomp/Stomp.php';
  */
 function stomp_civicrm_config(&$config) {
   _stomp_civix_civicrm_config($config);
+  // TODO: Investigate why helper is created 3 times during the request
+  $config->stomp = CRM_Stomp_StompHelper::singleton(); 
 }
 
 /**
@@ -79,7 +83,7 @@ function stomp_civicrm_managed(&$entities) {
  * On each database operation to be started check if the queue is available and stop
  * the operation if it's not.
  */
-function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {
+function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {    
 }
 
 
@@ -91,17 +95,26 @@ function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {
  */
 function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
 
-    $stomp = CRM_Stomp_StompHelper::singleton(); 
+    $config = CRM_Core_Config::singleton();
     
+    $logText = strtr("Firing off hook \"@op\" on \"@name #@id\": ", array(
+            '@op' => $op,
+            '@id' => $objectId,
+            '@name' => $objectName
+                ));
+   
     switch( $objectName ) {
         case 'Individual':
+            $config->stomp->log( $logText . 'Nothing to do', 'DEBUG');
+            break;
+        case 'Organization':
+            $config->stomp->log( $logText . 'Will send message!', 'DEBUG' );
+            // TODO: don't send object reference, get the data via API
+            // $config->stomp->log(CRM_Core_Error::debug($objectRef));
+            $config->stomp->send( $objectRef );
             break;
         default:
-            $stomp->log('Nothing to do', $op, $objectName, $objectId);
-    }
-        
-    if ( $objectName == 'Individual' && $op == 'edit' ) {           
-        $stomp->send( $map );
+            $config->stomp->log( $logText . 'Nothing to do', 'DEBUG');
     }
     
     return;

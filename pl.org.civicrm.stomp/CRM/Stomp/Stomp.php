@@ -46,11 +46,18 @@ class CRM_Stomp_StompHelper {
      */
     private $_stompServerURL = 'tcp://localhost:61613';
 
+    
+    private $_helperLifetimeStart = null;
+    private $_helperLifetimeEnd = null;
+    
     /**
      * class constructor
      *
      */
     function __construct() {
+
+        $this->log( "Creating helper object", 'DEBUG' );
+        $this->_helperLifetimeStart = microtime( true );
         // FIXME: path solely for command line testing
         //$path = '../../packages/stomp-php/FuseSource/';
         $path = 'packages/stomp-php/FuseSource/';
@@ -62,13 +69,13 @@ class CRM_Stomp_StompHelper {
         require_once $path . 'Stomp/Message/Bytes.php';
         require_once $path . 'Stomp/Message/Map.php';
 
-        $this->log( "Initialising" );
         $this->_stomp = new Stomp($this->_stompServerURL);
         try {
             $this->_stomp->connect();
+            $this->log( "Initialised STOMP connection #" . $this->_stomp->getSessionId(), 'DEBUG' );
         } catch (StompException $e) {
             CRM_Core_Error::fatal('Problem with STOMP connection initialisation! Caught exception: ' . $e->getMessage() . "\n");
-        }
+        }   
     }
 
      /**
@@ -76,6 +83,12 @@ class CRM_Stomp_StompHelper {
      *
      */
     function __destruct() {
+        $sessionId = $this->_stomp->getSessionId();
+        $this->_stomp->disconnect();
+        $this->log( 'Disconnected STOMP connection #' . $sessionId, 'DEBUG' );
+        $this->_helperLifetimeEnd = microtime( true );
+        $duration = $this->_helperLifetimeEnd - $this->_helperLifetimeStart;        
+        $this->log( 'Destroying: Helper lived for ' . $duration . ' seconds.', 'DEBUG' );
     }
 
 
@@ -91,53 +104,38 @@ class CRM_Stomp_StompHelper {
         return self::$_singleton;
     }
 
-    private function prepMessage( $msg ) {
+    private function _prepMessage( $msg ) {
         $header = array();
         $header['transformation'] = 'jms-map-json';
-        $mapMessage = new Map($map, $header);
+        $header['persistent'] = 'true';
+        $mapMessage = new Map($msg, $header);
         return $mapMessage;
     }
     
     public function send( $map ) {
         
-        $time_start = microtime();
+        $time_start = microtime( true );
 
-        $mapMessage = $this->prepMessage( $map );
+        $mapMessage = $this->_prepMessage( $map );
         $this->_stomp->send("/queue/civicrm", $mapMessage );
         
-        $time_end = microtime();
-        $d = $time_end - $time_start;
-        list($usec, $sec) = explode(" ", $d);
-        $duration = ((float)$usec + (float)$sec);
+        $time_end = microtime( true );
+        $duration = $time_end - $time_start;
         
-        $this->log( 'Sent message in ' . $duration . '! ', $op, $objectName, $objectId, $duration );
+        $this->log( 'Sole send duration was ' . $duration . ' seconds.', 'DEBUG' );
         
-    }
-    
-   
-    function microtime_float()
-    {
-        list($usec, $sec) = explode(" ", microtime());
-        return ((float)$usec + (float)$sec);
     }
     
     /**
      * Text file logging
      *
      */
-    public function log($message = 'UNKNOWN', $op = 'UNKNOWN', $objectName = 'UNKNOWN', $objectId = 'UNKNOWN', $duration = 'UNKNOWN') {
-        $text = strtr("@time - Performed \"@op\" on \"@name #@id\" with message: @msg\n", array(
-            '@op' => $op,
+    public function log($message = 'UNKNOWN', $level = 'DEBUG') {
+        $text = strtr("@time - StompHelper - @level - @message\n", array(
             '@time' => date('Y-m-d H:i:s'),
-            '@id' => $objectId,
-            '@name' => $objectName,
-            '@msg' => $message
+            '@message' => $message,
+            '@level' => $level
                 ));
-                
-        if( $duration !== 'UNKNOWN' ) {
-            $text = $text . " " . "(Duration: " . $duration . " )";
-        }
-
         file_put_contents($this->_logPath, $text, FILE_APPEND);
     }
 
