@@ -25,6 +25,8 @@ class CRM_Stomp_StompHelper {
      */
     private static $_singleton = NULL;
 
+    private $_connected = false;
+    
     /**
      * STOMP server connection object
      * @var object
@@ -70,13 +72,16 @@ class CRM_Stomp_StompHelper {
     }
     
     public function connect() {
-        $this->_stomp = new Stomp($this->_stompServerURL);
-        try {
-            $this->_stomp->connect();
-            $this->log( "Initialised STOMP connection #" . $this->_stomp->getSessionId(), 'DEBUG' );
-        } catch (StompException $e) {
-            CRM_Core_Error::fatal('Problem with STOMP connection initialisation! Caught exception: ' . $e->getMessage() . "\n");
-        }   
+        if( ! $this->_connected ) {
+            $this->_stomp = new Stomp($this->_stompServerURL);
+            try {
+                $this->_stomp->connect();
+                $this->_connected = true;
+                $this->log( "Initialised STOMP connection #" . $this->_stomp->getSessionId(), 'DEBUG' );
+            } catch (StompException $e) {
+                CRM_Core_Error::fatal('Problem with STOMP connection initialisation! Caught exception: ' . $e->getMessage() . "\n");
+            }
+        }
     }
 
      /**
@@ -116,9 +121,11 @@ class CRM_Stomp_StompHelper {
     }
     
     public function send( $map ) {
-        
+
         $time_start = microtime( true );
 
+        $this->connect();
+        
         $mapMessage = $this->_prepMessage( $map );
         $this->_stomp->send("/queue/civicrm", $mapMessage );
         
