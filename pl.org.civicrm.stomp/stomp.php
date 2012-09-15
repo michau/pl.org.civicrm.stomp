@@ -108,7 +108,8 @@ function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
             $config->stomp->log( $logText . 'Nothing to do', 'DEBUG');
             break;
         case 'Organization':
-            $config->stomp->log( $logText . 'Will send message!', 'DEBUG' );
+            $config->stomp->connect( );
+            $config->stomp->log( $logText . 'Connected, will send message!', 'DEBUG' );
             // TODO: don't send object reference, get the data via API
             // $config->stomp->log(CRM_Core_Error::debug($objectRef));
             $config->stomp->send( $objectRef );

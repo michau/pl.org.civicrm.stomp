@@ -54,8 +54,7 @@ class CRM_Stomp_StompHelper {
      * class constructor
      *
      */
-    function __construct() {
-
+    private function __construct() {
         $this->log( "Creating helper object", 'DEBUG' );
         $this->_helperLifetimeStart = microtime( true );
         // FIXME: path solely for command line testing
@@ -68,7 +67,9 @@ class CRM_Stomp_StompHelper {
         require_once $path . 'Stomp/Message.php';
         require_once $path . 'Stomp/Message/Bytes.php';
         require_once $path . 'Stomp/Message/Map.php';
-
+    }
+    
+    public function connect() {
         $this->_stomp = new Stomp($this->_stompServerURL);
         try {
             $this->_stomp->connect();
@@ -97,7 +98,7 @@ class CRM_Stomp_StompHelper {
      *
      * Method providing static instance of Stomp provider
      */
-    static function &singleton() {
+    public static function singleton() {
         if (!isset(self::$_singleton)) {
             self::$_singleton = new CRM_Stomp_StompHelper();
         }
