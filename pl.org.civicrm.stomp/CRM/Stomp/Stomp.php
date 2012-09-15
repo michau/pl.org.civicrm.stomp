@@ -84,9 +84,11 @@ class CRM_Stomp_StompHelper {
      *
      */
     function __destruct() {
-        $sessionId = $this->_stomp->getSessionId();
-        $this->_stomp->disconnect();
-        $this->log( 'Disconnected STOMP connection #' . $sessionId, 'DEBUG' );
+        if( isset( $this->_stomp ) ) {
+            $sessionId = $this->_stomp->getSessionId();
+            $this->_stomp->disconnect();
+            $this->log( 'Disconnected STOMP connection #' . $sessionId, 'DEBUG' );
+        }
         $this->_helperLifetimeEnd = microtime( true );
         $duration = $this->_helperLifetimeEnd - $this->_helperLifetimeStart;        
         $this->log( 'Destroying: Helper lived for ' . $duration . ' seconds.', 'DEBUG' );
