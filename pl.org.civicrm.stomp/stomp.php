@@ -1,5 +1,6 @@
 <?php
 
+require_once 'api/api.php';
 require_once 'stomp.civix.php';
 require_once 'CRM/Stomp/Stomp.php';
 require_once 'CRM/Core/Config.php';
@@ -110,9 +111,21 @@ function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
         case 'Organization':
             $config->stomp->connect( );
             $config->stomp->log( $logText . 'Connected, will send message!', 'DEBUG' );
-            // TODO: don't send object reference, get the data via API
-            // $config->stomp->log(CRM_Core_Error::debug($objectRef));
-            $config->stomp->send( $objectRef );
+            //TODO: Identifying custom fields here for now, but move it out to be done once
+            $customGroups = civicrm_api("CustomGroup","get", 
+                    array ('version' => '3','extends' =>'Organization'));
+            $returnFields = array();
+            foreach( $customGroups['values'] as $cgid => $group ) {
+                $customFields = civicrm_api( "CustomField", "get", 
+                        array( 'version' => 3, 'custom_group_id' => $cgid  ));
+                foreach( $customFields['values'] as $cfid => $values ) {
+                    $returnFields['return.custom_' . $cfid] = 1;
+                }                
+            }
+            $params = array_merge( $returnFields, array ('version' => '3','contact_type' =>'Organization', 'id' => $objectId ));
+            //$config->stomp->log( CRM_Core_Error::debug( $params ) );
+            $result = civicrm_api("Contact", "getsingle",  $params);
+            $config->stomp->send( $result );
             break;
         default:
             $config->stomp->log( $logText . 'Nothing to do', 'DEBUG');
