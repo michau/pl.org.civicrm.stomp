@@ -127,7 +127,7 @@ class CRM_Stomp_StompHelper {
         $this->connect();
         
         $mapMessage = $this->_prepMessage( $map );
-        $this->_stomp->send("/queue/civicrm", $mapMessage );
+        $this->_stomp->send("/queue/TESTQUEUE", $mapMessage );
         
         $time_end = microtime( true );
         $duration = $time_end - $time_start;
