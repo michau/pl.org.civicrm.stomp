@@ -1,0 +1,41 @@
+
+*** These modified files were found in JOE when it aborted on Mon Oct 15 11:37:20 2012
+*** JOE was aborted because the terminal closed
+
+*** File '(Unnamed)'
+klon.caltha.pl
+crm.dev.caltha.pl
+bazyngo.dev.caltha.pl
+bazyngo.dev.caltha.pl
+bazyngo.dev.caltha.pl
+bazyngo.dev.caltha.pl
+bazyngo.dev.caltha.pl
+/srv/bazyngo/
+$required
+
+*** File '(Unnamed)'
+explode
+webform_civicrm_explode_key
+$ftype
+$contact_id
+contact_type
+'organization'
+'Organization'
+thumbnail
+tolower
+urlencode
+
+*** File '(Unnamed)'
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+bazyngo_restfiles.module
+stomp.php
+stomp.php
+stomp.php

@@ -113,8 +113,10 @@ function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
             $config->stomp->log( $logText . 'Connected, will send message!', 'DEBUG' );
             //TODO: Identifying custom fields here for now, but move it out to be done once
             $customGroups = civicrm_api("CustomGroup","get", 
-                    array ('version' => '3','extends' => array('Organization')));
+                    array ('version' => '3','extends' => 'Organization' ));
             $returnFields = array();
+            
+
             foreach( $customGroups['values'] as $cgid => $group ) {
                 $customFields = civicrm_api( "CustomField", "get", 
                         array( 'version' => 3, 'custom_group_id' => $cgid  ));
@@ -122,9 +124,16 @@ function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
                     $returnFields['return.custom_' . $cfid] = 1;
                 }                
             }
-            $params = array_merge( $returnFields, array ('version' => '3', 'return_external_identifier' => 1, 'return_organization_name' => 1, 'id' => $objectId ));
+
+            $params = array ('version' => '3', 'id' => $objectId );
+            $result = civicrm_api( "Contact", "getsingle", $params );                        
+                        
+            $params = array_merge( $returnFields , $params );
+            $custom_result = civicrm_api( "Contact", "getsingle", $params );
+            
+            $result = array_merge( $custom_result, $result );
             //$config->stomp->log( CRM_Core_Error::debug( $params ) );
-            $result = civicrm_api( "Contact", "getsingle", $params );
+            
             $config->stomp->send( $result );
             break;
         default:
