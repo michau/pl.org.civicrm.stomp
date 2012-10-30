@@ -4,6 +4,7 @@ require_once 'api/api.php';
 require_once 'stomp.civix.php';
 require_once 'CRM/Stomp/Stomp.php';
 require_once 'CRM/Core/Config.php';
+
 use FuseSource\Stomp\Stomp;
 use FuseSource\Stomp\Message\Map;
 
@@ -15,7 +16,7 @@ require_once 'CRM/Stomp/Stomp.php';
 function stomp_civicrm_config(&$config) {
   _stomp_civix_civicrm_config($config);
   // TODO: Investigate why helper is created 3 times during the request
-  $config->stomp = CRM_Stomp_StompHelper::singleton(); 
+  $config->stomp = CRM_Stomp_StompHelper::singleton();
 }
 
 /**
@@ -84,9 +85,9 @@ function stomp_civicrm_managed(&$entities) {
  * On each database operation to be started check if the queue is available and stop
  * the operation if it's not.
  */
-function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {    
+function stomp_civicrm_pre($op, $objectName, $objectId, $objectRef) {
+  
 }
-
 
 /**
  * Implementation of hook_civicrm_post
@@ -94,51 +95,49 @@ function stomp_civicrm_pre( $op, $objectName, $objectId, $objectRef ) {
  * On each database operation check if it's necessary to send STOMP message
  * and send it if necessary. ;-)
  */
-function stomp_civicrm_post( $op, $objectName, $objectId, $objectRef ) {
+function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
 
-    $config = CRM_Core_Config::singleton();
-    
-    $logText = strtr("Firing off hook \"@op\" on \"@name #@id\": ", array(
-            '@op' => $op,
-            '@id' => $objectId,
-            '@name' => $objectName
-                ));
-   
-    switch( $objectName ) {
-        case 'Individual':
-            $config->stomp->log( $logText . 'Nothing to do', 'DEBUG');
-            break;
-        case 'Organization':
-            $config->stomp->connect( );
-            $config->stomp->log( $logText . 'Connected, will send message!', 'DEBUG' );
-            //TODO: Identifying custom fields here for now, but move it out to be done once
-            $customGroups = civicrm_api("CustomGroup","get", 
-                    array ('version' => '3','extends' => 'Organization' ));
-            $returnFields = array();
-            
+  $config = CRM_Core_Config::singleton();
 
-            foreach( $customGroups['values'] as $cgid => $group ) {
-                $customFields = civicrm_api( "CustomField", "get", 
-                        array( 'version' => 3, 'custom_group_id' => $cgid  ));
-                foreach( $customFields['values'] as $cfid => $values ) {
-                    $returnFields['return.custom_' . $cfid] = 1;
-                }                
-            }
+  $logText = strtr("Firing off hook \"@op\" on \"@name #@id\": ", array(
+    '@op' => $op,
+    '@id' => $objectId,
+    '@name' => $objectName
+      ));
 
-            $params = array ('version' => '3', 'id' => $objectId );
-            $result = civicrm_api( "Contact", "getsingle", $params );                        
-                        
-            $params = array_merge( $returnFields , $params );
-            $custom_result = civicrm_api( "Contact", "getsingle", $params );
-            
-            $result = array_merge( $custom_result, $result );
-            //$config->stomp->log( CRM_Core_Error::debug( $params ) );
-            
-            $config->stomp->send( $result );
-            break;
-        default:
-            $config->stomp->log( $logText . 'Nothing to do', 'DEBUG');
-    }
-    
-    return;
+  switch ($objectName) {
+    case 'Individual':
+      $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
+      break;
+    case 'Organization':
+      $config->stomp->connect();
+      $config->stomp->log($logText . 'Connected, will send message!', 'DEBUG');
+      //TODO: Identifying custom fields here for now, but move it out to be done once
+      $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
+      $returnFields = array();
+
+
+      foreach ($customGroups['values'] as $cgid => $group) {
+        $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
+        foreach ($customFields['values'] as $cfid => $values) {
+          $returnFields['return.custom_' . $cfid] = 1;
+        }
+      }
+
+      $params = array('version' => '3', 'id' => $objectId);
+      $result = civicrm_api("Contact", "getsingle", $params);
+
+      $params = array_merge($returnFields, $params);
+      $custom_result = civicrm_api("Contact", "getsingle", $params);
+
+      $result = array_merge($custom_result, $result);
+      //$config->stomp->log( CRM_Core_Error::debug( $params ) );
+
+      $config->stomp->send($result);
+      break;
+    default:
+      $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
+  }
+
+  return;
 }
