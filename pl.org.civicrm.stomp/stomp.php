@@ -2,13 +2,12 @@
 
 require_once 'api/api.php';
 require_once 'stomp.civix.php';
-require_once 'CRM/Stomp/Stomp.php';
 require_once 'CRM/Core/Config.php';
 
 use FuseSource\Stomp\Stomp;
 use FuseSource\Stomp\Message\Map;
 
-require_once 'CRM/Stomp/Stomp.php';
+require_once 'CRM/Stomp/StompHelper.php';
 
 /**
  * Implementation of hook_civicrm_config
@@ -17,6 +16,12 @@ function stomp_civicrm_config(&$config) {
   _stomp_civix_civicrm_config($config);
   // TODO: Investigate why helper is created 3 times during the request
   $config->stomp = CRM_Stomp_StompHelper::singleton();
+  // Default queue for data change messages
+  $config->stomp->addQueue('data', 'CIVICRM-DATA');
+  //Default queue for field labels/schema information messages
+  $config->stomp->addQueue('schema', 'CIVICRM-SCHEMA');
+  //Default queue for category tree messages
+  $config->stomp->addQueue('category', 'CIVICRM-CATEGORY');
 }
 
 /**
@@ -111,11 +116,12 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       break;
     case 'Organization':
       $config->stomp->connect();
-      $config->stomp->log($logText . 'Connected, will send message!', 'DEBUG');
+      $queue = $config->stomp->getQueue('data');
+      $config->stomp->log($logText . 'Connected, will send message to ' .
+          $queue, 'DEBUG');
       //TODO: Identifying custom fields here for now, but move it out to be done once
       $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
       $returnFields = array();
-
 
       foreach ($customGroups['values'] as $cgid => $group) {
         $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
@@ -133,7 +139,7 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       $result = array_merge($custom_result, $result);
       //$config->stomp->log( CRM_Core_Error::debug( $params ) );
 
-      $config->stomp->send($result);
+      $config->stomp->send($result, $queue);
       break;
     default:
       $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
