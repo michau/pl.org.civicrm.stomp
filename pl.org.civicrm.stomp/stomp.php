@@ -94,6 +94,27 @@ function stomp_civicrm_pre($op, $objectName, $objectId, $objectRef) {
   
 }
 
+// On every change of custom fields rebuild the tree and send it out
+function stomp_civicrm_postProcess($formName, &$form) {
+  if( $formName == 'CRM_Custom_Form_Field') {
+      $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
+      $fields = array();
+
+      foreach ($customGroups['values'] as $cgid => $group) {
+        $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
+        foreach ($customFields['values'] as $cfid => $values) {
+          $fields['custom_' . $cfid] = $values['label'];
+        }
+      }
+
+      $config = CRM_Core_Config::singleton();
+      $config->stomp->connect();
+      $queue = $config->stomp->getQueue('schema');
+      $config->stomp->send($fields, $queue);
+  }
+}
+
+
 /**
  * Implementation of hook_civicrm_post
  *
@@ -101,7 +122,7 @@ function stomp_civicrm_pre($op, $objectName, $objectId, $objectRef) {
  * and send it if necessary. ;-)
  */
 function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
-
+  
   $config = CRM_Core_Config::singleton();
 
   $logText = strtr("Firing off hook \"@op\" on \"@name #@id\": ", array(

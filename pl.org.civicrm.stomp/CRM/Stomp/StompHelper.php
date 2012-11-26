@@ -134,15 +134,15 @@ class CRM_Stomp_StompHelper {
   }
   
   public function send($map, $queue) {
-    
+
+    // Start timer
     $time_start = microtime(true);
-
+    
     $this->connect();
-
     $mapMessage = $this->_prepMessage($map);
-
     $this->_stomp->send($queue, $mapMessage);
 
+    // End timer
     $time_end = microtime(true);
     $duration = $time_end - $time_start;
 
