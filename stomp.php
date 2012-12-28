@@ -110,7 +110,7 @@ function stomp_civicrm_postProcess($formName, &$form) {
       $config = CRM_Core_Config::singleton();
       $config->stomp->connect();
       $queue = $config->stomp->getQueue('schema');
-      $config->stomp->send($fields, $queue);
+      $config->stomp->send( array("schema" => $fields), $queue);
   }
 }
 
