@@ -106,12 +106,59 @@ function stomp_civicrm_postProcess($formName, &$form) {
           $fields['custom_' . $cfid] = $values['label'];
         }
       }
-
+      
       $config = CRM_Core_Config::singleton();
       $config->stomp->connect();
       $queue = $config->stomp->getQueue('schema');
       $config->stomp->send( array("schema" => $fields), $queue);
   }
+}
+
+
+/**
+ * sort desc two array by last element value
+ */
+function _stomp_cmp_custom_fields_array($a, $b)
+{
+  return strcmp(end($b), end($a));
+}
+
+
+/**
+ * get contact custom values in cyklotron data format
+ */
+function _stomp_custom_value_get( $params ) {
+
+  $values = array();
+  $result = CRM_Core_BAO_CustomValueTable::getValues( $params );
+  // skip other organization subtype custom values fields.
+  if ($result['is_error'] == 0 ) {
+
+    unset($result['is_error'], $result['entityID']);
+    // Convert multi-value strings to arrays
+    $sp = CRM_Core_DAO::VALUE_SEPARATOR;
+    foreach ($result as $id => $value) {
+      if (strpos($value, $sp) !== FALSE) {
+        $value = explode($sp, trim($value, $sp));
+      }
+
+      $idArray = explode('_', $id);
+      if ($idArray[0] != 'custom') {
+        continue;
+      }
+      $fieldNumber = $idArray[1];
+      $n = empty($idArray[2]) ? 0 : $idArray[2];
+            
+      if($n) {
+        $values[$n]['custom_'.$fieldNumber] = $value;
+      } else {
+        $values['custom_'.$fieldNumber] = $value;
+      }      
+    }
+    // sort array by last element value
+    if($n) { usort($values,"_stomp_cmp_custom_fields_array"); }
+  }
+  return $values;
 }
 
 
@@ -142,23 +189,46 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
           $queue, 'DEBUG');
       //TODO: Identifying custom fields here for now, but move it out to be done once
       $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
-      $returnFields = array();
+      $resultCustomData = array();
 
       foreach ($customGroups['values'] as $cgid => $group) {
         $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
+        $customFieldsParams = array(); 
         foreach ($customFields['values'] as $cfid => $values) {
-          $returnFields['return.custom_' . $cfid] = 1;
+           $customFieldsParams['custom_' . $cfid] = 1;
+        }
+        $customFieldsParams = array_merge($customFieldsParams, array('entityID' => $objectId) );
+        $customFieldsValues = _stomp_custom_value_get( $customFieldsParams );
+        if( !empty( $customFieldsValues ) ) {
+          $resultCustomData['custom_group_'.$cgid] = $customFieldsValues;  
         }
       }
+      
+      $params = array( 'version' => 3, 
+                       'id' => $objectId, );
 
-      $params = array('version' => '3', 'id' => $objectId);
-      $result = civicrm_api("Contact", "getsingle", $params);
-
-      $params = array_merge($returnFields, $params);
-      $custom_result = civicrm_api("Contact", "getsingle", $params);
-
-      $result = array_merge($custom_result, $result);
-      //$config->stomp->log( CRM_Core_Error::debug( $params ) );
+      $paramsExtraData = array( 'api.website.get' => array(), 
+                                'api.im.get' => array(), 
+                                'api.phone.get' => array(), 
+                                'api.address.get' => array(), );
+                                                            
+      $result = civicrm_api("Contact", "get", array_merge($paramsExtraData, $params ));
+      if( empty($result['is_error']) && $result["values"][$result["id"]]) {
+         $result = $result["values"][$result["id"]];
+         foreach( $paramsExtraData as $key => $value ) {  
+           if(empty($result[$key]['is_error']) && !empty($result[$key]['values']) ) {
+             $result[$key] = $result[$key]['values'];
+           } else {
+             $result[$key] = array();
+           }
+         }
+      } else {
+        watchdog("stomp error", "contact get error:". print_r($result, true)."with params:". print_r($params, true));
+        $result = civicrm_api("Contact", "getsingle", $params);
+        $result = array_merge($result, $paramsExtraData);
+      }
+      $result = array_merge($result, $resultCustomData);
+      // watchdog("stomp debug 1", print_r($result,true));
 
       $config->stomp->send($result, $queue);
       break;
