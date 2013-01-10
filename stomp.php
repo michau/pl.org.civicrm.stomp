@@ -97,15 +97,18 @@ function stomp_civicrm_pre($op, $objectName, $objectId, $objectRef) {
 // On every change of custom fields rebuild the tree and send it out
 function stomp_civicrm_postProcess($formName, &$form) {
   if( $formName == 'CRM_Custom_Form_Field') {
-      $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
+      $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3'));
       $fields = array();
 
       foreach ($customGroups['values'] as $cgid => $group) {
-        $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
-        foreach ($customFields['values'] as $cfid => $values) {
-          $fields['custom_' . $cfid] = $values['label'];
-        }
-      }
+        if( $group['extends'] == 'Organization' || $group['extends'] == 'Address' ) {
+          $fields['custom_group_' . $cgid] = $group['title'];
+          $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
+          foreach ($customFields['values'] as $cfid => $values) {
+            $fields['custom_' . $cfid] = $values['label'];
+          }
+        } 
+      }            
       
       $config = CRM_Core_Config::singleton();
       $config->stomp->connect();
@@ -116,7 +119,7 @@ function stomp_civicrm_postProcess($formName, &$form) {
 
 
 /**
- * sort desc two array by last element value
+ * sort descending array by last element value
  */
 function _stomp_cmp_custom_fields_array($a, $b)
 {
@@ -125,12 +128,13 @@ function _stomp_cmp_custom_fields_array($a, $b)
 
 
 /**
- * get contact custom values in cyklotron data format
+ * get contact custom values array formatted as cyklotron data
  */
 function _stomp_custom_value_get( $params ) {
 
-  $values = array();
+  $values = array();    
   $result = CRM_Core_BAO_CustomValueTable::getValues( $params );
+  
   // skip other organization subtype custom values fields.
   if ($result['is_error'] == 0 ) {
 
@@ -211,13 +215,23 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
                                 'api.im.get' => array(), 
                                 'api.phone.get' => array(), 
                                 'api.address.get' => array(), );
-                                                            
+                                                                                            
       $result = civicrm_api("Contact", "get", array_merge($paramsExtraData, $params ));
       if( empty($result['is_error']) && $result["values"][$result["id"]]) {
          $result = $result["values"][$result["id"]];
          foreach( $paramsExtraData as $key => $value ) {  
            if(empty($result[$key]['is_error']) && !empty($result[$key]['values']) ) {
              $result[$key] = $result[$key]['values'];
+             $keyPart = explode('.', $key);
+             if( $keyPart[1] && $keyPart[1] == 'address') {
+               $entityType = ucfirst($keyPart[1]);
+               foreach( $result[$key] as $i => $entity ) {
+                 $customParams = array( "entityID" => $entity['id'], 
+                                        "entityType" => $entityType, );  
+                 $custom = _stomp_custom_value_get($customParams); 
+                 $result[$key][$i] += $custom;
+               }
+             }
            } else {
              $result[$key] = array();
            }
@@ -227,8 +241,7 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
         $result = civicrm_api("Contact", "getsingle", $params);
         $result = array_merge($result, $paramsExtraData);
       }
-      $result = array_merge($result, $resultCustomData);
-      // watchdog("stomp debug 1", print_r($result,true));
+      $result = array_merge($result, $resultCustomData);           
 
       $config->stomp->send($result, $queue);
       break;
