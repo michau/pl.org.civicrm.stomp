@@ -24,6 +24,86 @@ function stomp_civicrm_config(&$config) {
   $config->stomp->addQueue('category', 'CIVICRM-CATEGORY');
 }
 
+
+/**
+ *  Install options
+ */
+function _stomp_option_config_install() {
+
+
+  civicrm_initialize();   
+  require_once 'CRM/Core/BAO/OptionGroup.php';
+  require_once 'CRM/Core/BAO/OptionValue.php';
+       
+  $params = array( "title" => "pl.org.civicrm.stomp.schema.labels",
+                   "name" => "pl.org.civicrm.stomp.schema.labels",
+                   "is_active" => 1 );
+  $ids =  array();
+  $optionGroup = CRM_Core_BAO_OptionGroup::add($params, $ids);
+  
+  if($optionGroup) {
+  
+   $fields = array();
+   $result = civicrm_api( "Contact", "getfields", array("version" => 3, "action" => "get" ));
+   $fields = array_merge($fields, $result['values']);   
+   $result = civicrm_api( "Address", "getfields", array("version" => 3, "action" => "get" ));   
+   $fields = array_merge($fields, $result['values']);   
+   $result = civicrm_api( "Phone", "getfields", array("version" => 3,   "action" => "get" ));   
+   $fields = array_merge($fields, $result['values']);   
+   $result = civicrm_api( "Website", "getfields", array("version" => 3, "action" => "get" ));   
+   $fields = array_merge($fields, $result['values']);   
+   $result = civicrm_api( "Im", "getfields", array("version" => 3, "action" => "get" ));
+   $fields = array_merge($fields, $result['values']);   
+   unset( $fields["id"], $fields["contact_id"], $fields["hash"] );
+  
+   /* 
+    $cgs = civicrm_api("CustomGroup", "get", array('version' => '3'));
+    foreach ($cgs['values'] as $cgid => $group) {
+     if( $group['extends'] == 'Organization' || $group['extends'] == 'Address' ) {
+        $fields['custom_group_' . $cgid]['label'] = $group['title'];  
+     }
+    } 
+   */
+   
+    foreach( $fields as $key => $value ) {
+      
+      $info = explode('_', $key);      
+      if($info[0] != "custom") {
+         $params = array( "option_group_id" => $optionGroup->id, 
+                          "label" => !empty($value["title"]) ? $value["title"] : "$key",
+                          "value" => "$key",
+                          "is_active" => 1, );
+         $option = CRM_Core_BAO_OptionValue::add($params, $ids);     
+      }
+    } 
+  }
+
+}
+
+/**
+ *  uninstall options
+ */
+function _stomp_option_config_uninstall() {
+
+  civicrm_initialize();      
+  require_once 'CRM/Core/BAO/OptionGroup.php';
+  require_once 'CRM/Core/BAO/OptionValue.php';
+
+  $defaults = array();
+  $params = array( "name" => "pl.org.civicrm.stomp.schema.labels" );
+  $option_group = CRM_Core_BAO_OptionGroup::retrieve( $params, $defaults);
+
+  if($option_group) {
+    $options = CRM_Core_BAO_OptionValue::getOptionValuesArray($option_group->id);
+    foreach( $options as $i => $option) {
+        CRM_Core_BAO_OptionValue::del($option["id"]);
+    }
+  }
+  CRM_Core_BAO_OptionGroup::del( $option_group->id);  
+  
+}
+
+
 /**
  * Implementation of hook_civicrm_xmlMenu
  *
@@ -37,6 +117,7 @@ function stomp_civicrm_xmlMenu(&$files) {
  * Implementation of hook_civicrm_install
  */
 function stomp_civicrm_install() {
+  _stomp_option_config_install();  
   return _stomp_civix_civicrm_install();
 }
 
@@ -44,6 +125,7 @@ function stomp_civicrm_install() {
  * Implementation of hook_civicrm_uninstall
  */
 function stomp_civicrm_uninstall() {
+  _stomp_option_config_uninstall();
   return _stomp_civix_civicrm_uninstall();
 }
 
@@ -96,7 +178,9 @@ function stomp_civicrm_pre($op, $objectName, $objectId, $objectRef) {
 
 // On every change of custom fields rebuild the tree and send it out
 function stomp_civicrm_postProcess($formName, &$form) {
-  if( $formName == 'CRM_Custom_Form_Field') {
+  
+  if( $formName == 'CRM_Custom_Form_Field' || $formName == 'CRM_Admin_Form_OptionValue') {
+  
       $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3'));
       $fields = array();
 
@@ -108,8 +192,15 @@ function stomp_civicrm_postProcess($formName, &$form) {
             $fields['custom_' . $cfid] = $values['label'];
           }
         } 
-      }            
-      
+      }
+       
+      $defaults = array();
+      $params = array( "name" => "pl.org.civicrm.stomp.schema.labels" );
+      $option_group = CRM_Core_BAO_OptionGroup::retrieve( $params, $defaults);
+      if($option_group) {
+          $fields += CRM_Core_BAO_OptionValue::getOptionValuesAssocArray($option_group->id);
+      }
+
       $config = CRM_Core_Config::singleton();
       $config->stomp->connect();
       $queue = $config->stomp->getQueue('schema');
@@ -242,8 +333,8 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
         $result = array_merge($result, $paramsExtraData);
       }
       $result = array_merge($result, $resultCustomData);           
-
       $config->stomp->send($result, $queue);
+      
       break;
     default:
       $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
