@@ -210,6 +210,37 @@ function stomp_civicrm_postProcess($formName, &$form) {
 
 
 /**
+ * get terms object
+ */
+function _stomp_get_terms( $custom_field_id, $value = array(), $taxonomy_fields_ids = array()) {
+
+  if(in_array($custom_field_id, $taxonomy_fields_ids)) {
+
+   /*  if(is_array($value)) { 
+       $terms = array_values(taxonomy_term_load_multiple($value));       
+       if(!empty($terms)) {
+         return $terms;
+       }
+     } elseif($term = taxonomy_term_load($value)) {
+        return array( "vid" => $term->vid, "tid" => $term->tid, "name" => $term->name, "description" => $term->description );
+     }
+    */
+
+    if(is_array($value)) {
+        if(!empty($value) && $term = taxonomy_term_load($value[0])){
+          return array( "vid" => $term->vid, "tid" => $value );
+        }
+
+    } elseif($term = taxonomy_term_load($value)){
+          return array( "vid" => $term->vid, "tid" => array($value));    
+    }
+    return "";    
+  }
+  return $value;
+}
+
+
+/**
  * sort descending array by last element value
  */
 function _stomp_cmp_custom_fields_array($a, $b)
@@ -229,9 +260,13 @@ function _stomp_custom_value_get( $params ) {
   // skip other organization subtype custom values fields.
   if ($result['is_error'] == 0 ) {
 
-    unset($result['is_error'], $result['entityID']);
+    unset($result['is_error'], $result['entityID']);    
     // Convert multi-value strings to arrays
-    $sp = CRM_Core_DAO::VALUE_SEPARATOR;
+    $sp = CRM_Core_DAO::VALUE_SEPARATOR;    
+    // get taxonomy bazyngo_categorization module fields ids    
+    $taxonomy_fields_ids = array ( "0" => variable_get('bazyngo_categorization_customfield1_id', 0),
+                                   "1" => variable_get('bazyngo_categorization_customfield1_id', 0));
+    
     foreach ($result as $id => $value) {
       if (strpos($value, $sp) !== FALSE) {
         $value = explode($sp, trim($value, $sp));
@@ -240,10 +275,12 @@ function _stomp_custom_value_get( $params ) {
       $idArray = explode('_', $id);
       if ($idArray[0] != 'custom') {
         continue;
-      }
+      }      
       $fieldNumber = $idArray[1];
-      $n = empty($idArray[2]) ? 0 : $idArray[2];
-            
+      $n = empty($idArray[2]) ? 0 : $idArray[2];      
+
+      $value = _stomp_get_terms($fieldNumber, $value, $taxonomy_fields_ids);
+      
       if($n) {
         $values[$n]['custom_'.$fieldNumber] = $value;
       } else {
@@ -332,8 +369,8 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
         $result = civicrm_api("Contact", "getsingle", $params);
         $result = array_merge($result, $paramsExtraData);
       }
-      $result = array_merge($result, $resultCustomData);           
-      $config->stomp->send($result, $queue);
+      $result = array_merge($result, $resultCustomData);      
+      $config->stomp->send($result, $queue);      
       
       break;
     default:
