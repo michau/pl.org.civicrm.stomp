@@ -53,19 +53,11 @@ function _stomp_option_config_install() {
    $result = civicrm_api( "Website", "getfields", array("version" => 3, "action" => "get" ));   
    $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Im", "getfields", array("version" => 3, "action" => "get" ));
-   $fields = array_merge($fields, $result['values']);   
+   $fields = array_merge($fields, $result['values']);
+   $fields = array_merge($fields, array( "api.website.get" => array(), "api.im.get" => array(), "api.phone.get" => array(), "api.address.get" => array(), ));  
    unset( $fields["id"], $fields["contact_id"], $fields["hash"] );
-  
-   /* 
-    $cgs = civicrm_api("CustomGroup", "get", array('version' => '3'));
-    foreach ($cgs['values'] as $cgid => $group) {
-     if( $group['extends'] == 'Organization' || $group['extends'] == 'Address' ) {
-        $fields['custom_group_' . $cgid]['label'] = $group['title'];  
-     }
-    } 
-   */
    
-    foreach( $fields as $key => $value ) {
+   foreach( $fields as $key => $value ) {
       
       $info = explode('_', $key);      
       if($info[0] != "custom") {
@@ -75,7 +67,7 @@ function _stomp_option_config_install() {
                           "is_active" => 1, );
          $option = CRM_Core_BAO_OptionValue::add($params, $ids);     
       }
-    } 
+   } 
   }
 
 }
