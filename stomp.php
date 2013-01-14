@@ -260,9 +260,11 @@ function _stomp_custom_value_get( $params ) {
   // skip other organization subtype custom values fields.
   if ($result['is_error'] == 0 ) {
 
-    unset($result['is_error'], $result['entityID']);    
+    unset($result['is_error'], $result['entityID']);
+    
     // Convert multi-value strings to arrays
-    $sp = CRM_Core_DAO::VALUE_SEPARATOR;    
+    $sp = CRM_Core_DAO::VALUE_SEPARATOR;
+    
     // get taxonomy bazyngo_categorization module fields ids    
     $taxonomy_fields_ids = array ( "0" => variable_get('bazyngo_categorization_customfield1_id', 0),
                                    "1" => variable_get('bazyngo_categorization_customfield1_id', 0));
@@ -275,12 +277,11 @@ function _stomp_custom_value_get( $params ) {
       $idArray = explode('_', $id);
       if ($idArray[0] != 'custom') {
         continue;
-      }      
+      }
+      
       $fieldNumber = $idArray[1];
       $n = empty($idArray[2]) ? 0 : $idArray[2];      
-
       $value = _stomp_get_terms($fieldNumber, $value, $taxonomy_fields_ids);
-      
       if($n) {
         $values[$n]['custom_'.$fieldNumber] = $value;
       } else {
@@ -322,7 +323,11 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       //TODO: Identifying custom fields here for now, but move it out to be done once
       $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
       $resultCustomData = array();
-
+      $countries = CRM_Core_PseudoConstant::country();
+      $locationTypes = CRM_Core_PseudoConstant::locationType();
+      $imProviders = CRM_Core_PseudoConstant::IMProvider();
+      $websiteTypes = CRM_Core_PseudoConstant::websiteType();
+      $phoneTypes = CRM_Core_PseudoConstant::phoneType();      
       foreach ($customGroups['values'] as $cgid => $group) {
         $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
         $customFieldsParams = array(); 
@@ -354,12 +359,31 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
              if( $keyPart[1] && $keyPart[1] == 'address') {
                $entityType = ucfirst($keyPart[1]);
                foreach( $result[$key] as $i => $entity ) {
+                 $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);                
+                 $result[$key][$i]["country_id"] = CRM_Utils_Array::value($entity["country_id"], $countries);                                 
                  $customParams = array( "entityID" => $entity['id'], 
                                         "entityType" => $entityType, );  
                  $custom = _stomp_custom_value_get($customParams); 
                  $result[$key][$i] += $custom;
                }
              }
+             elseif( $keyPart[1] && $keyPart[1] == 'website') {
+               foreach( $result[$key] as $i => $entity ) {
+                $result[$key][$i]["website_type_id"] = CRM_Utils_Array::value($entity["website_type_id"], $websiteTypes);               
+               }
+             }
+             elseif( $keyPart[1] && $keyPart[1] == 'im') {
+              foreach( $result[$key] as $i => $entity ) {
+               $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);                                     
+               $result[$key][$i]["provider_id"] = CRM_Utils_Array::value($entity["provider_id"], $imProviders);               
+              }
+             }             
+             elseif( $keyPart[1] && $keyPart[1] == 'phone') {
+              foreach( $result[$key] as $i => $entity ) {
+               $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
+               $result[$key][$i]["phone_type_id"] = CRM_Utils_Array::value($entity["phone_type_id"], $phoneTypes);       
+              }  
+             }             
            } else {
              $result[$key] = array();
            }
@@ -369,9 +393,9 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
         $result = civicrm_api("Contact", "getsingle", $params);
         $result = array_merge($result, $paramsExtraData);
       }
-      $result = array_merge($result, $resultCustomData);      
-      $config->stomp->send($result, $queue);      
+      $result = array_merge($result, $resultCustomData);
       
+      $config->stomp->send($result, $queue);      
       break;
     default:
       $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
