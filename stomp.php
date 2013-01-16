@@ -43,7 +43,7 @@ function _stomp_option_config_install() {
   
   if($optionGroup) {
   
-   $fields = array();
+   $fields = array( );
    $result = civicrm_api( "Contact", "getfields", array("version" => 3, "action" => "get" ));
    $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Address", "getfields", array("version" => 3, "action" => "get" ));   
@@ -92,7 +92,7 @@ function _stomp_option_config_uninstall() {
     }
   }
   CRM_Core_BAO_OptionGroup::del( $option_group->id);  
-  
+
 }
 
 
@@ -351,8 +351,10 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
              if( $keyPart[1] && $keyPart[1] == 'address') {
                $entityType = ucfirst($keyPart[1]);
                foreach( $result[$key] as $i => $entity ) {
-                 $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);                
-                 $result[$key][$i]["country_id"] = CRM_Utils_Array::value($entity["country_id"], $countries);                                 
+                 $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
+                 if(!empty($entity["country_id"])) {
+                   $result[$key][$i]["country_id"] = CRM_Utils_Array::value($entity["country_id"], $countries);                                 
+                 }
                  $customParams = array( "entityID" => $entity['id'], 
                                         "entityType" => $entityType, );  
                  $custom = _stomp_custom_value_get($customParams); 
