@@ -189,7 +189,7 @@ function stomp_civicrm_postProcess($formName, &$form) {
       $fields = array();
 
       foreach ($customGroups['values'] as $cgid => $group) {
-        if( $group['extends'] == 'Organization' || $group['extends'] == 'Address' ) {
+        if( $group['extends'] == 'Organization' || $group['extends'] == 'Address' || $group['extends'] == 'Relationship'  ) {
           $fields['custom_group_' . $cgid] = $group['title'];
           $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
           foreach ($customFields['values'] as $cfid => $values) {
