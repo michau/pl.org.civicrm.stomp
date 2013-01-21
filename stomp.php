@@ -54,8 +54,20 @@ function _stomp_option_config_install() {
    $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Im", "getfields", array("version" => 3, "action" => "get" ));
    $fields = array_merge($fields, $result['values']);
-   $fields = array_merge($fields, array( "api.website.get" => array(), "api.im.get" => array(), "api.phone.get" => array(), "api.address.get" => array(), ));  
-   unset( $fields["id"], $fields["contact_id"], $fields["hash"] );
+   $result = civicrm_api( "Relationship", "getfields", array("version" => 3, "action" => "get" ));
+   $fields = array_merge($fields, $result['values']);
+   $result = civicrm_api("RelationshipType", "get", array("version" => 3 ) );
+   if($result['count']) {
+    $relationships = array();
+    foreach($result['values'] as $i => $value ) {
+     $id = $value['id'];
+     $relationships['relationship_type_'.$id.'_label_a_b']['title'] = $value['label_a_b'];
+     $relationships['relationship_type_'.$id.'_label_b_a']['title'] = $value['label_b_a'];     
+    }
+    $fields = array_merge($fields, $relationships);   
+   }
+   $fields = array_merge($fields, array( "api.website.get" => array(), "api.im.get" => array(), "api.phone.get" => array(), "api.address.get" => array(), "api.relationship.get" => array(),));  
+   unset( $fields["id"], $fields["hash"] );
    
    foreach( $fields as $key => $value ) {
       
@@ -286,6 +298,26 @@ function _stomp_custom_value_get( $params ) {
   return $values;
 }
 
+/**
+ * get contact relationship array formatted as cyklotron data
+ */
+function _stomp_relationship_get( $contact_id, $relationships ) {
+
+   $result = array();
+   // sort array by last element value   
+   usort($relationships,"_stomp_cmp_custom_fields_array");   
+   foreach( $relationships as $i => $relationship ) { 
+     if( $relationship['is_active'] ) {
+      $rtid = $relationship['relationship_type_id'];
+      if( $relationship['contact_id_a'] == $contact_id ) {
+        $result['relationship_type_'.$rtid.'_label_a_b'][] = $relationship['contact_id_b'];
+      } else {
+        $result['relationship_type_'.$rtid.'_label_b_a'][] = $relationship['contact_id_a'];      
+      }
+     }
+   }
+   return $result;
+}
 
 /**
  * Implementation of hook_civicrm_post
@@ -319,7 +351,8 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       $locationTypes = CRM_Core_PseudoConstant::locationType();
       $imProviders = CRM_Core_PseudoConstant::IMProvider();
       $websiteTypes = CRM_Core_PseudoConstant::websiteType();
-      $phoneTypes = CRM_Core_PseudoConstant::phoneType();      
+      $phoneTypes = CRM_Core_PseudoConstant::phoneType(); 
+           
       foreach ($customGroups['values'] as $cgid => $group) {
         $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
         $customFieldsParams = array(); 
@@ -339,7 +372,9 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       $paramsExtraData = array( 'api.website.get' => array(), 
                                 'api.im.get' => array(), 
                                 'api.phone.get' => array(), 
-                                'api.address.get' => array(), );
+                                'api.address.get' => array(),
+                                'api.relationship.get' => array(),
+                               );                              
                                                                                             
       $result = civicrm_api("Contact", "get", array_merge($paramsExtraData, $params ));
       if( empty($result['is_error']) && $result["values"][$result["id"]]) {
@@ -377,7 +412,13 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
                $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
                $result[$key][$i]["phone_type_id"] = CRM_Utils_Array::value($entity["phone_type_id"], $phoneTypes);       
               }  
-             }             
+             }
+             elseif( $keyPart[1] && $keyPart[1] == 'relationship' ) {
+
+               $result2 = civicrm_api("RelationshipType", "get", array("version" => 3 ) );
+               watchdog("bazyngo_ui debug", print_r($result2,true));
+               $result[$key] = _stomp_relationship_get( $objectId, $result[$key] );
+             }              
            } else {
              $result[$key] = array();
            }
