@@ -54,19 +54,11 @@ function _stomp_option_config_install() {
    $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Im", "getfields", array("version" => 3, "action" => "get" ));
    $fields = array_merge($fields, $result['values']);
-   $result = civicrm_api( "Relationship", "getfields", array("version" => 3, "action" => "get" ));
-   $fields = array_merge($fields, $result['values']);
-   $result = civicrm_api("RelationshipType", "get", array("version" => 3 ) );
-   if($result['count']) {
-    $relationships = array();
-    foreach($result['values'] as $i => $value ) {
-     $id = $value['id'];
-     $relationships['relationship_type_'.$id.'_label_a_b']['title'] = $value['label_a_b'];
-     $relationships['relationship_type_'.$id.'_label_b_a']['title'] = $value['label_b_a'];     
-    }
-    $fields = array_merge($fields, $relationships);   
-   }
-   $fields = array_merge($fields, array( "api.website.get" => array(), "api.im.get" => array(), "api.phone.get" => array(), "api.address.get" => array(), "api.relationship.get" => array(),));  
+   $fields = array_merge($fields, array( "api.website.get" => array(), 
+                                         "api.im.get" => array(), 
+                                         "api.phone.get" => array(), 
+                                         "api.address.get" => array(), 
+                                         "api.relationship.get" => array(),));  
    unset( $fields["id"], $fields["hash"] );
    
    foreach( $fields as $key => $value ) {
@@ -185,11 +177,11 @@ function stomp_civicrm_postProcess($formName, &$form) {
   
   if( $formName == 'CRM_Custom_Form_Field' || $formName == 'CRM_Admin_Form_OptionValue') {
   
-      $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3'));
+      $customGroups = civicrm_api("CustomGroup", "get", array('version' => 3));
       $fields = array();
 
       foreach ($customGroups['values'] as $cgid => $group) {
-        if( $group['extends'] == 'Organization' || $group['extends'] == 'Address' || $group['extends'] == 'Relationship'  ) {
+        if( $group['extends'] == 'Organization' || $group['extends'] == 'Address') {
           $fields['custom_group_' . $cgid] = $group['title'];
           $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
           foreach ($customFields['values'] as $cfid => $values) {
@@ -197,6 +189,17 @@ function stomp_civicrm_postProcess($formName, &$form) {
           }
         } 
       }
+
+      $relationshipTypes = civicrm_api("RelationshipType", "get", array('version' => 3));
+      if($relationshipTypes['count']) {
+         $relationships = array();
+         foreach($relationshipTypes['values'] as $i => $value ) {
+           $id = $value['id'];
+           $relationships['relationship_type_'.$id.'_label_a_b'] = $value['label_a_b'];
+           $relationships['relationship_type_'.$id.'_label_b_a'] = $value['label_b_a'];     
+         }
+         $fields = array_merge($fields, $relationships);   
+      }      
        
       $defaults = array();
       $params = array( "name" => "pl.org.civicrm.stomp.schema.labels" );
