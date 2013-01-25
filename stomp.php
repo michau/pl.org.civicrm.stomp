@@ -58,9 +58,7 @@ function _stomp_option_config_install() {
                                          "api.im.get" => array(), 
                                          "api.phone.get" => array(), 
                                          "api.address.get" => array(), 
-                                         "api.relationship.get" => array(),));  
-   unset( $fields["id"], $fields["hash"] );
-   
+                                         "api.relationship.get" => array(),));     
    foreach( $fields as $key => $value ) {
       
       $info = explode('_', $key);      
@@ -176,45 +174,97 @@ function stomp_civicrm_pre($op, $objectName, $objectId, $objectRef) {
 function stomp_civicrm_postProcess($formName, &$form) {
   
   if( $formName == 'CRM_Custom_Form_Field' || $formName == 'CRM_Admin_Form_OptionValue') {
-  
-      $customGroups = civicrm_api("CustomGroup", "get", array('version' => 3));
-      $fields = array();
+    stomp_post_schema();  
+  }
+}
 
-      foreach ($customGroups['values'] as $cgid => $group) {
-        if( $group['extends'] == 'Organization' || $group['extends'] == 'Address') {
-          $fields['custom_group_' . $cgid] = $group['title'];
-          $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
-          foreach ($customFields['values'] as $cfid => $values) {
-            $fields['custom_' . $cfid] = $values['label'];
-          }
-        } 
+/**
+ * Send schema message
+ */ 
+function stomp_post_schema() {
+
+      $fields        = array();
+      $defaults      = array();
+      $option_fields = array();      
+      $params        = array( "name" => "pl.org.civicrm.stomp.schema.labels" );
+      $option_group  = CRM_Core_BAO_OptionGroup::retrieve( $params, $defaults);
+      if($option_group) {
+          $option_fields = CRM_Core_BAO_OptionValue::getOptionValuesAssocArray($option_group->id);
+      }
+      $organizationFeilds = civicrm_api( "contact", "getfields", array("version" => 3, "contact_type"=> "Organization", "action" => "get" ));
+      foreach( $organizationFeilds['values'] as $key => $values ) {
+        if(!empty($values['extends']) && $values['extends'] == "Organization") {
+          watchdog("field", print_r($values['label'],true));
+          $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $values['label']);
+          $fields[$key]['type'] = $values["data_type"];          
+          $fields[$key]['htmlType'] = $values["html_type"];          
+        }
+        else if(empty($values['extends'])) {
+          $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $key);
+          $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);          
+          $fields[$key]['htmlType'] = "String";
+        }
+      }
+       
+      $extendsFeildTypes = array( "address", "phone", "website", "im", "relationship" );
+      foreach( $extendsFeildTypes as $i => $extendsFeildType ) {
+       $extendsFeilds = civicrm_api( "$extendsFeildType", "getfields", array("version" => 3, "action" => "get" ));
+       foreach( $extendsFeilds['values'] as $key => $values ) { 
+         if(!empty($values['extends'])) {       
+           $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $values['label']);
+           $fields[$key]['type'] = $values['data_type'];          
+           $fields[$key]['htmlType'] = $values['html_type'];          
+         } else {        
+           $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $key);
+           $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);          
+           $fields[$key]['htmlType'] = "String";   
+         }
+       }
+       $fields["api.$extendsFeildType.get"]['label'] = CRM_Utils_Array::value("api.$extendsFeildType.get", $option_fields, "$extendsFeildType");
+       $fields["api.$extendsFeildType.get"]['type'] = 'group';
+       $fields["api.$extendsFeildType.get"]['htmlType'] = 'group';
+       $fields["api.$extendsFeildType.get"]['fields'] = array_keys($extendsFeilds['values']);   
       }
 
       $relationshipTypes = civicrm_api("RelationshipType", "get", array('version' => 3));
       if($relationshipTypes['count']) {
          $relationships = array();
-         foreach($relationshipTypes['values'] as $i => $value ) {
-           $id = $value['id'];
-           $relationships['relationship_type_'.$id.'_label_a_b'] = $value['label_a_b'];
-           $relationships['relationship_type_'.$id.'_label_b_a'] = $value['label_b_a'];     
+         foreach($relationshipTypes['values'] as $i => $values ) {
+           $id = $values['id'];
+           $relationships['relationship_type_'.$id.'_label_a_b']['label'] = $values['label_a_b'];
+           $relationships['relationship_type_'.$id.'_label_a_b']['type'] = 'organization';            
+           $relationships['relationship_type_'.$id.'_label_a_b']['htmlType'] = 'link';              
+           $relationships['relationship_type_'.$id.'_label_b_a']['label'] = $values['label_b_a'];   
+           $relationships['relationship_type_'.$id.'_label_b_a']['type'] = 'organization';            
+           $relationships['relationship_type_'.$id.'_label_b_a']['htmlType'] = 'link';                            
          }
          $fields = array_merge($fields, $relationships);   
-      }      
-       
-      $defaults = array();
-      $params = array( "name" => "pl.org.civicrm.stomp.schema.labels" );
-      $option_group = CRM_Core_BAO_OptionGroup::retrieve( $params, $defaults);
-      if($option_group) {
-          $fields += CRM_Core_BAO_OptionValue::getOptionValuesAssocArray($option_group->id);
       }
 
+      $customGroups = civicrm_api("CustomGroup", "get", array('version' => 3));      
+      foreach ($customGroups['values'] as $cgid => $group) {
+        if( $group['extends'] == 'Organization' ) {
+          $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
+          $customFields_ids = array();
+          foreach ($customFields['values'] as $cfid => $values) {
+            $fields['custom_'.$cfid]['label'] = $values['label'];
+            $fields['custom_'.$cfid]['type'] = $values["data_type"];          
+            $fields['custom_'.$cfid]['htmlType'] = $values["html_type"];            
+            $customFields_ids[] = 'custom_' . $cfid;
+          }        
+          $fields['custom_group_' . $cgid]['label'] = $group['title'];          
+          $fields['custom_group_' . $cgid]['type'] = 'group';          
+          $fields['custom_group_' . $cgid]['htmlType'] = 'group';                                    
+          $fields['custom_group_' . $cgid]['fields'] = $customFields_ids;          
+        } 
+      }
+     
       $config = CRM_Core_Config::singleton();
       $config->stomp->connect();
       $queue = $config->stomp->getQueue('schema');
       $config->stomp->send( array("schema" => $fields), $queue);
-  }
-}
 
+}
 
 /**
  * get terms object
@@ -222,16 +272,6 @@ function stomp_civicrm_postProcess($formName, &$form) {
 function _stomp_get_terms( $custom_field_id, $value = array(), $taxonomy_fields_ids = array()) {
 
   if(in_array($custom_field_id, $taxonomy_fields_ids)) {
-
-   /*  if(is_array($value)) { 
-       $terms = array_values(taxonomy_term_load_multiple($value));       
-       if(!empty($terms)) {
-         return $terms;
-       }
-     } elseif($term = taxonomy_term_load($value)) {
-        return array( "vid" => $term->vid, "tid" => $term->tid, "name" => $term->name, "description" => $term->description );
-     }
-    */
 
     if(is_array($value)) {
         if(!empty($value) && $term = taxonomy_term_load($value[0])){
@@ -313,9 +353,17 @@ function _stomp_relationship_get( $contact_id, $relationships ) {
      if( $relationship['is_active'] ) {
       $rtid = $relationship['relationship_type_id'];
       if( $relationship['contact_id_a'] == $contact_id ) {
-        $result['relationship_type_'.$rtid.'_label_a_b'][] = $relationship['contact_id_b'];
+        $external_id = civicrm_api("Contact", "getvalue", array("version" => '3', 
+                                                                "contact_id" => $relationship['contact_id_b'], 
+                                                                "return" => 'external_identifier'));     
+                                                                                                                                 
+        $result['relationship_type_'.$rtid.'_label_a_b'][] = $external_id;
       } else {
-        $result['relationship_type_'.$rtid.'_label_b_a'][] = $relationship['contact_id_a'];      
+        $external_id = civicrm_api("Contact", "getvalue", array("version" => '3', 
+                                                                "contact_id" => $relationship['contact_id_a'], 
+                                                                "return" => 'external_identifier'));
+                                                                           
+        $result['relationship_type_'.$rtid.'_label_b_a'][] = $external_id;      
       }
      }
    }
@@ -370,7 +418,7 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       }
       
       $params = array( 'version' => 3, 
-                       'id' => $objectId, );
+                       'id' => $objectId );
 
       $paramsExtraData = array( 'api.website.get' => array(), 
                                 'api.im.get' => array(), 
@@ -417,7 +465,6 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
               }  
              }
              elseif( $keyPart[1] && $keyPart[1] == 'relationship' ) {
-
                $result2 = civicrm_api("RelationshipType", "get", array("version" => 3 ) );
                watchdog("bazyngo_ui debug", print_r($result2,true));
                $result[$key] = _stomp_relationship_get( $objectId, $result[$key] );
