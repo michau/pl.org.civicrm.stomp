@@ -314,7 +314,7 @@ function _stomp_custom_value_get( $params ) {
     
     // get taxonomy bazyngo_categorization module fields ids    
     $taxonomy_fields_ids = array ( "0" => variable_get('bazyngo_categorization_customfield1_id', 0),
-                                   "1" => variable_get('bazyngo_categorization_customfield1_id', 0));
+                                   "1" => variable_get('bazyngo_categorization_customfield2_id', 0));
     
     foreach ($result as $id => $value) {
       if (strpos($value, $sp) !== FALSE) {
