@@ -50,15 +50,20 @@ function _stomp_option_config_install() {
    $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Phone", "getfields", array("version" => 3,   "action" => "get" ));   
    $fields = array_merge($fields, $result['values']);   
+   $result = civicrm_api( "Email", "getfields", array("version" => 3,   "action" => "get" ));   
+   $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Website", "getfields", array("version" => 3, "action" => "get" ));   
    $fields = array_merge($fields, $result['values']);   
    $result = civicrm_api( "Im", "getfields", array("version" => 3, "action" => "get" ));
    $fields = array_merge($fields, $result['values']);
-   $fields = array_merge($fields, array( "api.website.get" => array(), 
-                                         "api.im.get" => array(), 
-                                         "api.phone.get" => array(), 
-                                         "api.address.get" => array(), 
-                                         "api.relationship.get" => array(),));     
+   $fields = array_merge($fields, array( "website_group" => array(), 
+                                         "im_group" => array(), 
+                                         "phone_group" => array(),
+                                         "email_group" => array(), 
+                                         "address_group" => array(), 
+                                         "relationship_group" => array(),));     
+   
+   unset($fields['id']);                                            
    foreach( $fields as $key => $value ) {
       
       $info = explode('_', $key);      
@@ -206,7 +211,7 @@ function stomp_post_schema() {
         }
       }
        
-      $extendsFeildTypes = array( "address", "phone", "website", "im", "relationship" );
+      $extendsFeildTypes = array( "address", "phone", "email", "website", "im", "relationship" );
       foreach( $extendsFeildTypes as $i => $extendsFeildType ) {
        $extendsFeilds = civicrm_api( "$extendsFeildType", "getfields", array("version" => 3, "action" => "get" ));
        foreach( $extendsFeilds['values'] as $key => $values ) { 
@@ -220,10 +225,10 @@ function stomp_post_schema() {
            $fields[$key]['htmlType'] = "String";   
          }
        }
-       $fields["api.$extendsFeildType.get"]['label'] = CRM_Utils_Array::value("api.$extendsFeildType.get", $option_fields, "$extendsFeildType");
-       $fields["api.$extendsFeildType.get"]['type'] = 'group';
-       $fields["api.$extendsFeildType.get"]['htmlType'] = 'group';
-       $fields["api.$extendsFeildType.get"]['fields'] = array_keys($extendsFeilds['values']);   
+       $fields[$extendsFeildType."_group"]['label'] = CRM_Utils_Array::value("api.$extendsFeildType.get", $option_fields, "$extendsFeildType");
+       $fields[$extendsFeildType."_group"]['type'] = 'group';
+       $fields[$extendsFeildType."_group"]['htmlType'] = 'group';
+       $fields[$extendsFeildType."_group"]['fields'] = array_keys($extendsFeilds['values']);   
       }
 
       $relationshipTypes = civicrm_api("RelationshipType", "get", array('version' => 3));
@@ -299,7 +304,7 @@ function _stomp_cmp_custom_fields_array($a, $b)
 /**
  * get contact custom values array formatted as cyklotron data
  */
-function _stomp_custom_value_get( $params ) {
+function _stomp_custom_value_get( $params, $defaults = array() ) {
 
   $values = array();    
   $result = CRM_Core_BAO_CustomValueTable::getValues( $params );
@@ -314,8 +319,11 @@ function _stomp_custom_value_get( $params ) {
     
     // get taxonomy bazyngo_categorization module fields ids    
     $taxonomy_fields_ids = array ( "0" => variable_get('bazyngo_categorization_customfield1_id', 0),
-                                   "1" => variable_get('bazyngo_categorization_customfield2_id', 0));
-    
+                                   "1" => variable_get('bazyngo_categorization_customfield2_id', 0));                                    
+                                                                      
+    $data_filed = array();
+    $tmp_values = array();
+        
     foreach ($result as $id => $value) {
       if (strpos($value, $sp) !== FALSE) {
         $value = explode($sp, trim($value, $sp));
@@ -328,16 +336,34 @@ function _stomp_custom_value_get( $params ) {
       
       $fieldNumber = $idArray[1];
       $n = empty($idArray[2]) ? 0 : $idArray[2];      
-      $value = _stomp_get_terms($fieldNumber, $value, $taxonomy_fields_ids);
+      
+      // check if field has default value, store fields ids where data is filed.
+      if($n && !in_array($n, $data_filed) ) {
+          $defaults['custom_'.$fieldNumber] = !isset($defaults['custom_'.$fieldNumber]) ? $defaults['custom_'.$fieldNumber] : "";
+          if($defaults['custom_'.$fieldNumber] != $value ) {
+              $data_filed[] = $n;
+          }
+      }
+      
+      $value = _stomp_get_terms($fieldNumber, $value, $taxonomy_fields_ids);   
       if($n) {
-        $values[$n]['custom_'.$fieldNumber] = $value;
+        $tmp_values[$n]['custom_'.$fieldNumber] = $value;
       } else {
         $values['custom_'.$fieldNumber] = $value;
       }      
     }
-    // sort array by last element value
-    if($n) { usort($values,"_stomp_cmp_custom_fields_array"); }
-  }
+
+    if($n) { 
+      // rewrite only data filed multisets.
+      foreach($data_filed as $i => $n ) {
+         $values[$n] = $tmp_values[$n];
+      }
+      // sort array by last element value      
+      usort($values,"_stomp_cmp_custom_fields_array"); 
+      // watchdog("stomp debug 10", print_r($defaults,true) . print_r($data_filed,true) . print_r($tmp_values, true));                
+    }
+  } 
+
   return $values;
 }
 
@@ -407,11 +433,13 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
       foreach ($customGroups['values'] as $cgid => $group) {
         $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
         $customFieldsParams = array(); 
+        $defaultValues = array();
         foreach ($customFields['values'] as $cfid => $values) {
            $customFieldsParams['custom_' . $cfid] = 1;
+           $defaultValues['custom_' . $cfid] = isset($values['default_value']) ? $values['default_value'] : "";  
         }
         $customFieldsParams = array_merge($customFieldsParams, array('entityID' => $objectId) );
-        $customFieldsValues = _stomp_custom_value_get( $customFieldsParams );
+        $customFieldsValues = _stomp_custom_value_get( $customFieldsParams, $defaultValues );
         if( !empty( $customFieldsValues ) ) {
           $resultCustomData['custom_group_'.$cgid] = $customFieldsValues;  
         }
@@ -422,7 +450,8 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
 
       $paramsExtraData = array( 'api.website.get' => array(), 
                                 'api.im.get' => array(), 
-                                'api.phone.get' => array(), 
+                                'api.phone.get' => array(),
+                                'api.email.get' => array(), 
                                 'api.address.get' => array(),
                                 'api.relationship.get' => array(),
                                );                              
@@ -443,7 +472,7 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
                  }
                  $customParams = array( "entityID" => $entity['id'], 
                                         "entityType" => $entityType, );  
-                 $custom = _stomp_custom_value_get($customParams); 
+                 $custom = _stomp_custom_value_get($customParams ); 
                  $result[$key][$i] += $custom;
                }
              }
@@ -464,22 +493,24 @@ function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
                $result[$key][$i]["phone_type_id"] = CRM_Utils_Array::value($entity["phone_type_id"], $phoneTypes);       
               }  
              }
+             elseif( $keyPart[1] && $keyPart[1] == 'email') {
+              foreach( $result[$key] as $i => $entity ) {
+               $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
+              }  
+             }
              elseif( $keyPart[1] && $keyPart[1] == 'relationship' ) {
-               $result2 = civicrm_api("RelationshipType", "get", array("version" => 3 ) );
-               watchdog("bazyngo_ui debug", print_r($result2,true));
                $result[$key] = _stomp_relationship_get( $objectId, $result[$key] );
-             }              
-           } else {
-             $result[$key] = array();
+               
+             }
+             $result[$keyPart[1]."_group"] = array_merge(array(), $result[$key]);            
            }
+           unset($result[$key]);
          }
       } else {
         watchdog("stomp error", "contact get error:". print_r($result, true)."with params:". print_r($params, true));
         $result = civicrm_api("Contact", "getsingle", $params);
-        $result = array_merge($result, $paramsExtraData);
       }
-      $result = array_merge($result, $resultCustomData);
-      
+      $result = array_merge($result, $resultCustomData);      
       $config->stomp->send($result, $queue);      
       break;
     default:
