@@ -225,7 +225,7 @@ function stomp_post_schema() {
            $fields[$key]['htmlType'] = "String";   
          }
        }
-       $fields[$extendsFeildType."_group"]['label'] = CRM_Utils_Array::value("api.$extendsFeildType.get", $option_fields, "$extendsFeildType");
+       $fields[$extendsFeildType."_group"]['label'] = CRM_Utils_Array::value($extendsFeildType."_group", $option_fields, "$extendsFeildType");
        $fields[$extendsFeildType."_group"]['type'] = 'group';
        $fields[$extendsFeildType."_group"]['htmlType'] = 'group';
        $fields[$extendsFeildType."_group"]['fields'] = array_keys($extendsFeilds['values']);   
