@@ -340,11 +340,10 @@ function _stomp_custom_value_get( $params, $defaults = array() ) {
       // check if field has default value, store fields ids where data is filed.
       if($n && !in_array($n, $data_filed) ) {
           $defaults['custom_'.$fieldNumber] = !isset($defaults['custom_'.$fieldNumber]) ? $defaults['custom_'.$fieldNumber] : "";
-          if($defaults['custom_'.$fieldNumber] != $value ) {
+          if($defaults['custom_'.$fieldNumber] != $value && $defaults['custom_'.$fieldNumber]!= 0 ) {
               $data_filed[] = $n;
           }
-      }
-      
+      }      
       $value = _stomp_get_terms($fieldNumber, $value, $taxonomy_fields_ids);   
       if($n) {
         $tmp_values[$n]['custom_'.$fieldNumber] = $value;
@@ -359,8 +358,7 @@ function _stomp_custom_value_get( $params, $defaults = array() ) {
          $values[$n] = $tmp_values[$n];
       }
       // sort array by last element value      
-      usort($values,"_stomp_cmp_custom_fields_array"); 
-      // watchdog("stomp debug 10", print_r($defaults,true) . print_r($data_filed,true) . print_r($tmp_values, true));                
+      usort($values,"_stomp_cmp_custom_fields_array");           
     }
   } 
 
