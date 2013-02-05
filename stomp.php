@@ -213,6 +213,7 @@ function stomp_post_schema() {
        
       $extendsFeildTypes = array( "address", "phone", "email", "website", "im", "relationship" );
       foreach( $extendsFeildTypes as $i => $extendsFeildType ) {
+       $_fields = array();
        $extendsFeilds = civicrm_api( "$extendsFeildType", "getfields", array("version" => 3, "action" => "get" ));
        foreach( $extendsFeilds['values'] as $key => $values ) { 
          if(!empty($values['extends'])) {       
@@ -224,11 +225,15 @@ function stomp_post_schema() {
            $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);          
            $fields[$key]['htmlType'] = "String";   
          }
-       }
+         $info = explode('_', $key);      
+         if($extendsFeildType == "address" || $info[0] != "custom") {
+             $_fields[] = $key;  
+         }         
+       }       
        $fields[$extendsFeildType."_group"]['label'] = CRM_Utils_Array::value($extendsFeildType."_group", $option_fields, "$extendsFeildType");
        $fields[$extendsFeildType."_group"]['type'] = 'group';
        $fields[$extendsFeildType."_group"]['htmlType'] = 'group';
-       $fields[$extendsFeildType."_group"]['fields'] = array_keys($extendsFeilds['values']);   
+       $fields[$extendsFeildType."_group"]['fields'] = $_fields;   
       }
 
       $relationshipTypes = civicrm_api("RelationshipType", "get", array('version' => 3));
