@@ -308,13 +308,13 @@ function stomp_post_status( $objectId, OrganizationStatus $org_status ) {
       if(is_numeric($external_identifier) && !empty($org_status)) {                                                          
              $message = array('timestamp' => time(), 
                               'external_identifier' => $external_identifier, 
+                              'action' => $org_status->action,
                               'status' => $org_status->status );
                               
              $config = CRM_Core_Config::singleton();
              $config->stomp->connect();
              $queue = $config->stomp->getQueue('status');
-             $config->stomp->log("Organizaton ($objectId) status $org_status->status message." . 'Connected, will send message to ' . $queue, 'DEBUG');      
-              watchdog("stomp error", "sending STATUS message with params object_id:".$objectId." org_status:". print_r($org_status, true));                              
+             $config->stomp->log("Organizaton ($objectId) $org_status->action status $org_status->status message." . 'Connected, will send message to ' . $queue, 'DEBUG'); 
              $config->stomp->send( $message, $queue);       
       } else {
               watchdog("stomp error", "error sending STATUS message with params object_id:".$objectId." org_status:". print_r($org_status, true));                 
