@@ -8,6 +8,7 @@ use FuseSource\Stomp\Stomp;
 use FuseSource\Stomp\Message\Map;
 
 require_once 'CRM/Stomp/StompHelper.php';
+require_once 'OrganizationStatus.php';
 
 /**
  * Implementation of hook_civicrm_config
@@ -22,6 +23,8 @@ function stomp_civicrm_config(&$config) {
   $config->stomp->addQueue('schema', 'CIVICRM-SCHEMA');
   //Default queue for category tree messages
   $config->stomp->addQueue('category', 'CIVICRM-CATEGORY');
+  //Default queue for organization status messages
+  $config->stomp->addQueue('status', 'CIVICRM-STATUS');
 }
 
 
@@ -288,10 +291,36 @@ function stomp_post_schema() {
       $config = CRM_Core_Config::singleton();
       $config->stomp->connect();
       $queue = $config->stomp->getQueue('schema');
-      //watchdog("bazyngo schema test", print_r($fields, true));
       $config->stomp->send( array("schema" => $fields), $queue);
 
 }
+
+
+/**
+ *  Post status message
+ */
+function stomp_post_status( $objectId, OrganizationStatus $org_status ) {
+
+      $external_identifier = civicrm_api("Contact", "getvalue", array( 'version'=> 3, 
+                                                                       'id'=> $objectId, 
+                                                                       'return' => 'external_identifier'));                                                          
+                                                                
+      if(is_numeric($external_identifier) && !empty($org_status)) {                                                          
+             $message = array('timestamp' => time(), 
+                              'external_identifier' => $external_identifier, 
+                              'status' => $org_status->status );
+                              
+             $config = CRM_Core_Config::singleton();
+             $config->stomp->connect();
+             $queue = $config->stomp->getQueue('status');
+             $config->stomp->log("Organizaton ($objectId) status $org_status->status message." . 'Connected, will send message to ' . $queue, 'DEBUG');      
+              watchdog("stomp error", "sending STATUS message with params object_id:".$objectId." org_status:". print_r($org_status, true));                              
+             $config->stomp->send( $message, $queue);       
+      } else {
+              watchdog("stomp error", "error sending STATUS message with params object_id:".$objectId." org_status:". print_r($org_status, true));                 
+      }
+}
+
 
 /**
  * get terms object
@@ -419,11 +448,7 @@ function _stomp_relationship_get( $contact_id, $relationships ) {
 function stomp_data_post( $objectId ) {
 
       $config = CRM_Core_Config::singleton();
-      $logText = ""; /* strtr("Firing off hook \"@op\" on \"@name #@id\": ", array(
-                       '@op' => $op,
-                       '@id' => $objectId,
-                       '@name' => $objectName
-      ));*/
+      $logText = "Organizaton ($objectId) data message.";
 
       $config->stomp->connect();
       $queue = $config->stomp->getQueue('data');
