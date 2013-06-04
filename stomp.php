@@ -213,8 +213,15 @@ function stomp_post_schema() {
       if($option_group) {
           $option_fields = CRM_Core_BAO_OptionValue::getOptionValuesAssocArray($option_group->id);
       }
+
+      $inluded_embedded_field_names = array("contact_type",
+                                            "contact_sub_type", 
+                                            "external_identifier", 
+                                            "organization_name");
+
       $organizationFeilds = civicrm_api( "contact", "getfields", array("version" => 3, "contact_type"=> "Organization", "action" => "get" ));
       foreach( $organizationFeilds['values'] as $key => $values ) {
+       if(in_array($key,$inluded_embedded_field_names)) {
         if(!empty($values['extends']) && $values['extends'] == "Organization") {
           $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $values['label']);
           $fields[$key]['type'] = $values["data_type"];          
@@ -225,26 +232,53 @@ function stomp_post_schema() {
           $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);          
           $fields[$key]['htmlType'] = "String";
         }
+       }
       }
-       
-      $extendsFeildTypes = array( "address", "phone", "email", "website", "im", "relationship" );
+
+      $excluded_field_names = array("id", 
+                                    "contact_id", 
+                                    "is_primary", 
+                                    "is_billing", 
+                                    "street_number_suffix", 
+                                    "street_number_predirectional",
+                                    "street_type",
+                                    "street_number_postdirectional",
+                                    "supplemental_address_1",
+                                    "supplemental_address_2",
+                                    "supplemental_address_3",
+                                    "state_province_id",
+                                    "postal_code_suffix",
+                                    "usps_adc",
+                                    "county_id",
+                                    "timezone",
+                                    "name",
+                                    "master_id",
+                                    "custom_101", //disable relationship weight
+                                    );             
+                                    
+      $extendsFeildTypes = array( "address", "phone", "email", "website", "im", "relationship" ); //wyłączone na życzenie kilenta
       foreach( $extendsFeildTypes as $i => $extendsFeildType ) {
        $_fields = array();
        $extendsFeilds = civicrm_api( "$extendsFeildType", "getfields", array("version" => 3, "action" => "get" ));
        foreach( $extendsFeilds['values'] as $key => $values ) { 
+        if(!in_array($key,$excluded_field_names)) {
          if(!empty($values['extends'])) {       
            $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $values['label']);
            $fields[$key]['type'] = $values['data_type'];          
-           $fields[$key]['htmlType'] = $values['html_type'];          
+           $fields[$key]['htmlType'] = $values['html_type'];                      
          } else {        
            $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $key);
-           $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);          
-           $fields[$key]['htmlType'] = "String";   
+           $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);
+           if($key == "country_id") {
+              $fields[$key]['options'] = CRM_Core_PseudoConstant::country();
+           }
+           $fields[$key]['htmlType'] = "String";
          }
          $info = explode('_', $key);      
          if($extendsFeildType == "address" || $info[0] != "custom") {
              $_fields[] = $key;  
-         }         
+         }
+        }         
        }       
        $fields[$extendsFeildType."_group"]['label'] = CRM_Utils_Array::value($extendsFeildType."_group", $option_fields, "$extendsFeildType");
        $fields[$extendsFeildType."_group"]['type'] = 'group';
@@ -252,7 +286,13 @@ function stomp_post_schema() {
        $fields[$extendsFeildType."_group"]['fields'] = $_fields;   
       }
 
-      $relationshipTypes = civicrm_api("RelationshipType", "get", array('version' => 3));
+      /* 
+       * wyłączone na życzenie klienta
+       */
+      $include_relationships_ids = array( '10', '11');      
+      $relationshipTypes = civicrm_api("RelationshipType", "get", array('version' => 3,  
+                                                                        'is_active' => 1,
+                                                                        'id' => array( 'IN' => $include_relationships_ids)));
       if($relationshipTypes['count']) {
          $relationships = array();
          foreach($relationshipTypes['values'] as $i => $values ) {
@@ -500,9 +540,9 @@ function stomp_data_post( $objectId ) {
                $entityType = ucfirst($keyPart[1]);
                foreach( $result[$key] as $i => $entity ) {
                  $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
-                 if(!empty($entity["country_id"])) {
-                   $result[$key][$i]["country_id"] = CRM_Utils_Array::value($entity["country_id"], $countries);                                 
-                 }
+                 //if(!empty($entity["country_id"])) { // disabled. Schema message send counties option list  
+                 //  $result[$key][$i]["country_id"] = CRM_Utils_Array::value($entity["country_id"], $countries);                                 
+                 //}
                  $customParams = array( "entityID" => $entity['id'], 
                                         "entityType" => $entityType, );  
                  $custom = _stomp_custom_value_get($customParams ); 
@@ -533,7 +573,7 @@ function stomp_data_post( $objectId ) {
              }
              elseif( $keyPart[1] && $keyPart[1] == 'relationship' ) {
                $result[$key] = _stomp_relationship_get( $objectId, $result[$key] );
-               
+                              
              }
              $result[$keyPart[1]."_group"] = array_merge(array(), $result[$key]);            
            } else {
