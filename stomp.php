@@ -232,6 +232,10 @@ function stomp_post_schema() {
           $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);          
           $fields[$key]['htmlType'] = "String";
         }
+        if($key == "contact_sub_type") {
+          require_once 'CRM/Contact/BAO/ContactType.php'; 
+          $fields[$key]['options'] = CRM_Contact_BAO_ContactType::subTypePairs('Organization', FALSE, NULL, FALSE);
+        }
        }
       }
 
