@@ -270,6 +270,9 @@ function stomp_post_schema() {
            $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $values['label']);
            $fields[$key]['type'] = $values['data_type'];          
            $fields[$key]['htmlType'] = $values['html_type'];                      
+           if(!empty($values['option_group_id'])) {
+               $fields[$key]['options'] = stomp_get_options( $values['option_group_id'] );
+           }           
          } else {        
            $fields[$key]['label'] = CRM_Utils_Array::value($key, $option_fields, $key);
            $fields[$key]['type'] = CRM_Utils_Type::typeToString($values["type"]);
@@ -332,10 +335,10 @@ function stomp_post_schema() {
         } 
       }
      
-      $config = CRM_Core_Config::singleton();
-      $config->stomp->connect();
-      $queue = $config->stomp->getQueue('schema');
-      $config->stomp->send( array("schema" => $fields), $queue);
+     $config = CRM_Core_Config::singleton();
+     $config->stomp->connect();
+     $queue = $config->stomp->getQueue('schema');
+     $config->stomp->send( array("schema" => $fields), $queue);
 
 }
 
