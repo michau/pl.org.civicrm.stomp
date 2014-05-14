@@ -23,6 +23,7 @@ class CRM_Stomp_StompHelper {
    */
   private static $_singleton = NULL;
   private $_connected = false;
+  private $_enabled = true;
 
   /**
    * STOMP server connection object
@@ -133,8 +134,13 @@ class CRM_Stomp_StompHelper {
     }    
   }
   
+  public function enabled( $value ) {
+     $this->_enabled = $value ? true : false;
+  }
+  
   public function send($map, $queue) {
 
+   if($this->_enabled) {
     // Start timer
     $time_start = microtime(true);
     
@@ -146,7 +152,10 @@ class CRM_Stomp_StompHelper {
     $time_end = microtime(true);
     $duration = $time_end - $time_start;
 
-    $this->log('Sole send duration was ' . $duration . ' seconds.', 'DEBUG');
+     $this->log('Sole send duration was ' . $duration . ' seconds.', 'DEBUG');
+    } else {
+     $this->log('Stomp is disabled. Message not sent to qui ' . $duration . ' seconds.', 'DEBUG');    
+    }
   }
 
   /**
