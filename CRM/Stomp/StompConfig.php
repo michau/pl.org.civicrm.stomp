@@ -21,4 +21,17 @@ class CRM_Stomp_StompConfig {
    */
   public $stompServerURL = 'tcp://localhost:61613';  
 
+  /**
+   * The username of STOMP server
+   * @var string
+   * @access private
+   */
+  public $stompUser = null;
+
+  /**
+   * The password of STOMP server
+   * @var string
+   * @access private
+   */  
+  public $stompPassword = null;
 }

@@ -78,7 +78,8 @@ class CRM_Stomp_StompHelper {
     if (!$this->_connected) {
       $this->_stomp = new Stomp($this->_config->stompServerURL);
       try {
-        $this->_stomp->connect();
+        $this->_stomp->connect($this->_config->stompUser, $this->_config->stompPassword);        
+        
         $this->_connected = true;
         $this->log("Initialised STOMP connection #" . $this->_stomp->getSessionId(), 'DEBUG');
       } catch (StompException $e) {
@@ -154,7 +155,7 @@ class CRM_Stomp_StompHelper {
 
      $this->log('Sole send duration was ' . $duration . ' seconds.', 'DEBUG');
     } else {
-     $this->log('Stomp is disabled. Message not sent to qui ' . $duration . ' seconds.', 'DEBUG');    
+     $this->log('Stomp is disabled. Message not sent.', 'DEBUG');
     }
   }
 
