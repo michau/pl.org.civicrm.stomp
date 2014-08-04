@@ -148,7 +148,8 @@ class CRM_Stomp_StompHelper {
     $this->connect();
     $mapMessage = $this->_prepMessage($map);
     $this->_stomp->send($queue, $mapMessage);
-
+    unset($mapMessage);
+    
     // End timer
     $time_end = microtime(true);
     $duration = $time_end - $time_start;

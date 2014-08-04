@@ -331,7 +331,8 @@ function stomp_post_schema() {
           $fields['custom_group_' . $cgid]['label'] = $group['title'];          
           $fields['custom_group_' . $cgid]['type'] = 'group';          
           $fields['custom_group_' . $cgid]['htmlType'] = 'group';                                    
-          $fields['custom_group_' . $cgid]['fields'] = $customFields_ids;          
+          $fields['custom_group_' . $cgid]['fields'] = $customFields_ids;
+          unset($customFields);
         } 
       }
      
@@ -339,7 +340,7 @@ function stomp_post_schema() {
      $config->stomp->connect();
      $queue = $config->stomp->getQueue('schema');
      $config->stomp->send( array("schema" => $fields), $queue);
-
+     unset($fields);
 }
 
 
@@ -447,7 +448,8 @@ function _stomp_custom_value_get( $params, $defaults = array() ) {
         $tmp_values[$n]['custom_'.$fieldNumber] = $value;
       } else {
         $values['custom_'.$fieldNumber] = $value;
-      }            
+      }
+      unset($value);            
     }
 
     if($n) { 
@@ -523,6 +525,10 @@ function stomp_data_post( $objectId ) {
         if( !empty( $customFieldsValues ) ) {
           $resultCustomData['custom_group_'.$cgid] = $customFieldsValues;  
         }
+        unset($customFieldsParams);        
+        unset($customFieldsValues);
+        unset($defaultValues);
+        unset($customFields);
       }
       
       $params = array( 'version' => 3, 
@@ -532,7 +538,7 @@ function stomp_data_post( $objectId ) {
                                 'api.im.get' => array(), 
                                 'api.phone.get' => array(),
                                 'api.email.get' => array(), 
-                                'api.address.get' => array(),
+                                 'api.address.get' => array(),
                                 'api.relationship.get' => array(),
                                );                              
                                                                                             
@@ -554,6 +560,7 @@ function stomp_data_post( $objectId ) {
                                         "entityType" => $entityType, );  
                  $custom = _stomp_custom_value_get($customParams ); 
                  $result[$key][$i] += $custom;
+                 unset($custom);
                }
              }
              elseif( $keyPart[1] && $keyPart[1] == 'website') {
@@ -594,7 +601,11 @@ function stomp_data_post( $objectId ) {
       }
       $result = array_merge($result, $resultCustomData);      
       $config->stomp->send($result, $queue);
-
+      unset($result);
+      unset($resultCustomData);
+      unset($params);
+      ob_flush();
+      flush();
 }
 
 /**
@@ -603,127 +614,4 @@ function stomp_data_post( $objectId ) {
  * On each database operation check if it's necessary to send STOMP message
  * and send it if necessary. ;-)
  */
-function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) {
-/*
- if( $op != "view" ) {  
-
-  $config = CRM_Core_Config::singleton();
-  $logText = strtr("Firing off hook \"@op\" on \"@name #@id\": ", array(
-    '@op' => $op,
-    '@id' => $objectId,
-    '@name' => $objectName
-      ));
-
-  switch ($objectName) {
-
-    case 'Individual':
-      $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
-      break;
-    case 'Organization':
-     
-      $config->stomp->connect();
-      $queue = $config->stomp->getQueue('data');
-      $config->stomp->log($logText . 'Connected, will send message to ' . $queue, 'DEBUG');
-          
-      //TODO: Identifying custom fields here for now, but move it out to be done once
-      $customGroups = civicrm_api("CustomGroup", "get", array('version' => '3', 'extends' => 'Organization'));
-      $resultCustomData = array();
-      $countries = CRM_Core_PseudoConstant::country();
-      $locationTypes = CRM_Core_PseudoConstant::locationType();
-      $imProviders = CRM_Core_PseudoConstant::IMProvider();
-      $websiteTypes = CRM_Core_PseudoConstant::websiteType();
-      $phoneTypes = CRM_Core_PseudoConstant::phoneType(); 
-           
-      foreach ($customGroups['values'] as $cgid => $group) {
-        $customFields = civicrm_api("CustomField", "get", array('version' => 3, 'custom_group_id' => $cgid));
-        $customFieldsParams = array(); 
-        $defaultValues = array();
-        foreach ($customFields['values'] as $cfid => $values) {
-           $customFieldsParams['custom_' . $cfid] = 1;
-           $defaultValues['custom_' . $cfid] = isset($values['default_value']) ? $values['default_value'] : "";  
-        }
-        $customFieldsParams = array_merge($customFieldsParams, array('entityID' => $objectId) );
-        $customFieldsValues = _stomp_custom_value_get( $customFieldsParams, $defaultValues );
-        if( !empty( $customFieldsValues ) ) {
-          $resultCustomData['custom_group_'.$cgid] = $customFieldsValues;  
-        }
-      }
-      
-      $params = array( 'version' => 3, 
-                       'id' => $objectId );
-
-      $paramsExtraData = array( 'api.website.get' => array(), 
-                                'api.im.get' => array(), 
-                                'api.phone.get' => array(),
-                                'api.email.get' => array(), 
-                                'api.address.get' => array(),
-                                'api.relationship.get' => array(),
-                               );                              
-                                                                                            
-      $result = civicrm_api("Contact", "get", array_merge($paramsExtraData, $params ));
-      if( empty($result['is_error']) && $result["values"][$result["id"]]) {
-         $result = $result["values"][$result["id"]];
-         foreach( $paramsExtraData as $key => $value ) {  
-           if(empty($result[$key]['is_error'])) {
-             $result[$key] = $result[$key]['values'];
-             $keyPart = explode('.', $key);
-             if( $keyPart[1] && $keyPart[1] == 'address') {
-               $entityType = ucfirst($keyPart[1]);
-               foreach( $result[$key] as $i => $entity ) {
-                 $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
-                 if(!empty($entity["country_id"])) {
-                   $result[$key][$i]["country_id"] = CRM_Utils_Array::value($entity["country_id"], $countries);                                 
-                 }
-                 $customParams = array( "entityID" => $entity['id'], 
-                                        "entityType" => $entityType, );  
-                 $custom = _stomp_custom_value_get($customParams ); 
-                 $result[$key][$i] += $custom;
-               }
-             }
-             elseif( $keyPart[1] && $keyPart[1] == 'website') {
-               foreach( $result[$key] as $i => $entity ) {
-                $result[$key][$i]["website_type_id"] = CRM_Utils_Array::value($entity["website_type_id"], $websiteTypes);               
-               }
-             }
-             elseif( $keyPart[1] && $keyPart[1] == 'im') {
-              foreach( $result[$key] as $i => $entity ) {
-               $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);                                     
-               $result[$key][$i]["provider_id"] = CRM_Utils_Array::value($entity["provider_id"], $imProviders);               
-              }
-             }             
-             elseif( $keyPart[1] && $keyPart[1] == 'phone') {
-              foreach( $result[$key] as $i => $entity ) {
-               $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
-               $result[$key][$i]["phone_type_id"] = CRM_Utils_Array::value($entity["phone_type_id"], $phoneTypes);       
-              }  
-             }
-             elseif( $keyPart[1] && $keyPart[1] == 'email') {
-              foreach( $result[$key] as $i => $entity ) {
-               $result[$key][$i]["location_type_id"] = CRM_Utils_Array::value($entity["location_type_id"], $locationTypes);
-              }  
-             }
-             elseif( $keyPart[1] && $keyPart[1] == 'relationship' ) {
-               $result[$key] = _stomp_relationship_get( $objectId, $result[$key] );
-               
-             }
-             $result[$keyPart[1]."_group"] = array_merge(array(), $result[$key]);            
-           } else {
-              watchdog("stomp error", "contact get error:". print_r($result, true)."with params:". print_r($params, true)." for keys:".$key);           
-           }
-           unset($result[$key]);
-         }
-      } else {
-        watchdog("stomp error", "contact get error:". print_r($result, true)."with params:". print_r($params, true)." for keys:".$key);
-        $result = civicrm_api("Contact", "getsingle", $params);
-      }
-      $result = array_merge($result, $resultCustomData);      
-      $config->stomp->send($result, $queue);      
-      break;
-     
-    default:
-      $config->stomp->log($logText . 'Nothing to do', 'DEBUG');
-  }
-  }
-  return;
-  */
-}
+function stomp_civicrm_post($op, $objectName, $objectId, $objectRef) { }
